@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# 本地环境和密钥
+.env
+.env.*
+!.env.example
+
+# 未脱敏项目样本和规范原文件
+data/examples/*
+!data/examples/.gitkeep
+data/references/*
+!data/references/.gitkeep
+
+# 生成结果
+outputs/
+*.tmp
+~$*
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
