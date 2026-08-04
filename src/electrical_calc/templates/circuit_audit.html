@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}完整回路核验 · 电气计算台{% endblock %}
+{% block content %}
+<section class="quick-head circuit-head">
+  <div>
+    <p class="eyebrow">DRAWING AUDIT · COMPLETE CIRCUIT</p>
+    <h1>图纸完整回路核验</h1>
+    <p>图纸是既有设计条件。系统先按原电缆和原断路器复算，再把替代候选单独列出；两种结论互不替代。</p>
+  </div>
+  <aside class="quick-badge"><span>匿名验收链</span><strong>变压器 → 低压柜 → 分配电箱 → 用电设备</strong><small>上级系统100MVA；其余固定条件均标记为测试夹具</small></aside>
+</section>
+
+{% if errors %}
+<div class="alert danger"><strong>不能计算</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+<form method="post" action="/complete-circuit" class="panel stack">
+  <div><p class="eyebrow">DRAWING CONDITIONS</p><h2>图纸线路长度</h2><p class="muted">本页只开放图纸常见的长度条件。变压器、负荷、电缆和断路器规格来自匿名测试夹具，不要求用户填写R/X、Zs或I²t。</p></div>
+  <div class="wizard-grid three">
+    {% for segment_id, label in segment_labels.items() %}
+    <label>{{ label }}（m）
+      <input name="length_{{ segment_id }}" type="number" min="0.01" step="0.01" required value="{{ lengths[segment_id] }}">
+    </label>
+    {% endfor %}
+  </div>
+  <button type="submit">复算原设计并生成独立替代候选</button>
+</form>
+
+{% if audit_result %}
+{% set audit = audit_result.outputs %}
+<section class="panel candidate-panel">
+  <div class="section-title">
+    <div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原图设计复核</h2></div>
+    <span class="status-pill {% if audit_result.provisional_status == '通过' %}pass{% elif audit_result.provisional_status == '不通过' %}fail{% else %}pending{% endif %}">{{ audit_result.provisional_status }}</span>
+  </div>
+  <p class="basis-note"><strong>核验对象：</strong>图纸原部件。替代设计未计入本栏结论。</p>
+
+  <h3>逐节点计算</h3>
+  <div class="selection-grid">
+    {% for node in audit.chain_result.outputs.node_results %}
+    <article class="selection-card">
+      <h3>{{ node.node_name }}</h3>
+      <p>累计压降：{{ node.cumulative_voltage_drop_v|round(4) }} V / {{ node.cumulative_voltage_drop_percent|round(4) }}%</p>
+      <p>最大三相短路：{% if node.three_phase_short_circuit_ka is not none %}{{ node.three_phase_short_circuit_ka|round(4) }} kA{% else %}不适用{% endif %}</p>
+      <p>最小相—N短路：{% if node.phase_neutral_short_circuit_a is not none %}{{ node.phase_neutral_short_circuit_a|round(2) }} A{% else %}不适用（本段未配置N）{% endif %}</p>
+      <p>最小相—PE故障：{% if node.earth_fault_current_a is not none %}{{ node.earth_fault_current_a|round(2) }} A{% else %}无法判断{% endif %}</p>
+    </article>
+    {% endfor %}
+  </div>
+
+  <h3>原图电缆</h3>
+  <div class="selection-grid">
+    {% for cable in audit.installed_cables %}
+    <article class="selection-card">
+      <h3>{{ cable.designation }}</h3>
+      <p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p>
+      <p>载流量核验：<strong>{{ cable.ampacity_status }}</strong></p>
+      <p>PE {{ cable.protective_section_mm2 }} mm²；最小截面核验：<strong>{{ cable.pe_minimum_section.provisional_status }}</strong></p>
+    </article>
+    {% endfor %}
+  </div>
+
+  <h3>原图断路器</h3>
+  <div class="selection-grid">
+    {% for breaker in audit.installed_breakers %}
+    <article class="selection-card">
+      <h3>{{ breaker.designation }}</h3>
+      <p>负荷电流：{{ breaker.checks.load_current.status }}（{{ breaker.checks.load_current.criterion or breaker.checks.load_current.reason }}）</p>
+      <p>电缆配合：{{ breaker.checks.cable_coordination.status }}（{{ breaker.checks.cable_coordination.criterion or breaker.checks.cable_coordination.reason }}）</p>
+      <p>分断能力：{{ breaker.checks.breaking_capacity.status }}（{{ breaker.checks.breaking_capacity.criterion or breaker.checks.breaking_capacity.reason }}）</p>
+      <p>自动切断：{{ breaker.checks.automatic_disconnection.status }}（{{ breaker.checks.automatic_disconnection.criterion or breaker.checks.automatic_disconnection.reason }}）</p>
+      <p>相导体热稳定：{{ breaker.checks.phase_thermal.status }}；允许最长切除时间 {{ breaker.checks.phase_thermal.maximum_permitted_clearing_time_s }} s</p>
+      <p>PE热稳定：{{ breaker.checks.pe_thermal.status }}；允许最大I²t {{ breaker.checks.pe_thermal.maximum_permitted_let_through_energy_a2s }} A²·s</p>
+      <p><strong>原器件结论：{{ breaker.status }}</strong></p>
+    </article>
+    {% endfor %}
+  </div>
+  <h3>上下级保护配合</h3>
+  <div class="selection-grid">
+    {% for item in audit.protection_coordination %}
+    <article class="selection-card">
+      <h3>{{ item.upstream_designation }} → {{ item.downstream_designation }}</h3>
+      <p>选择性/后备保护：<strong>{{ item.status }}</strong></p>
+      <p>{{ item.reason }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="basis-note">末端累计电压降 {{ audit.voltage_drop_check.actual_percent|round(4) }}%，限值 {{ audit.voltage_drop_check.limit_percent }}%：{{ audit.voltage_drop_check.status }}。</p>
+</section>
+
+{% set alternatives = alternative_result.outputs.viable_combinations + alternative_result.outputs.incomplete_combinations %}
+<section class="panel candidate-panel">
+  <div class="section-title">
+    <div><p class="eyebrow">ALTERNATIVE DESIGN</p><h2>独立替代设计候选</h2></div>
+    <span class="status-pill pending">不代表原图合规</span>
+  </div>
+  {% if alternatives %}
+  {% set choice = alternatives[0] %}
+  <div class="selection-grid">
+    {% for cable in choice.cables %}
+    <article class="selection-card">
+      <h3>{{ segment_labels[cable.candidate_id.split(':')[0]] }}</h3>
+      <p>{{ cable.cable_specification }}</p>
+      <p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="selection-grid">
+    {% for breaker in choice.breakers %}
+    <article class="selection-card">
+      <h3>{{ breaker.family }} 通用参数候选</h3>
+      <p>壳架 {{ breaker.frame_current_a }} A；In {{ breaker.rated_current_a }} A；Ue {{ breaker.rated_voltage_v }} V</p>
+      <p>Icu {{ breaker.selected_icu_ka }} kA；采用极数 {{ breaker.adopted_poles }}</p>
+      <p>候选状态：{{ breaker.provisional_status }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% if choice.missing_items %}<div class="alert warning"><strong>替代候选仍未闭合</strong><ul>{% for item in choice.missing_items %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% else %}
+  <div class="alert warning"><strong>没有可继续的替代组合</strong><p>{{ alternative_result.warnings|join('；') }}</p></div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

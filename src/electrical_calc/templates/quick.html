@@ -1,0 +1,1270 @@
+{% extends "base.html" %}
+{% block title %}0.4kV 回路计算 · 电气计算台{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="/">首页</a><span>/</span><strong>0.4kV 回路计算</strong></nav>
+
+<section class="quick-head circuit-head">
+  <div>
+    <p class="eyebrow">LOW-VOLTAGE CIRCUIT</p>
+    <h1>少量输入，连续完成回路计算</h1>
+    <p>先完成负荷电流和设备初选；线路条件足够时继续计算电压降。高级区可按可追溯资料进行线路末端短路、分断能力及TN接地故障暂算。</p>
+  </div>
+  <div class="quick-badge">
+    <span>当前能力</span>
+    <strong>回路初选 + 保护暂算</strong>
+    <small>未批准依据及未完成校核不会被包装成正式结论</small>
+  </div>
+</section>
+
+<form method="post" action="/quick" class="circuit-wizard">
+  <section class="panel wizard-section">
+    <div class="wizard-title">
+      <span class="wizard-number">01</span>
+      <div><p class="eyebrow">CIRCUIT</p><h2>这是什么回路</h2></div>
+    </div>
+    <div class="role-options">
+      <label>
+        <input type="radio" name="circuit_role" value="single_device" {% if form.circuit_role == 'single_device' %}checked{% endif %}>
+        <span><strong>单台设备</strong><small>按设备实际相制校验</small></span>
+      </label>
+      <label>
+        <input type="radio" name="circuit_role" value="group_load" {% if form.circuit_role == 'group_load' %}checked{% endif %}>
+        <span><strong>同类负荷汇总</strong><small>可按三相均衡汇总单相设备</small></span>
+      </label>
+      <label>
+        <input type="radio" name="circuit_role" value="feeder" {% if form.circuit_role == 'feeder' %}checked{% endif %}>
+        <span><strong>配电箱或干线</strong><small>需要时填写需要系数</small></span>
+      </label>
+    </div>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-title">
+      <span class="wizard-number">02</span>
+      <div><p class="eyebrow">KNOWN VALUE</p><h2>你已经知道什么</h2></div>
+    </div>
+    <div class="wizard-grid three">
+      <label>已知量
+        <select name="input_basis" id="input-basis">
+          <option value="kw" {% if form.input_basis == 'kw' %}selected{% endif %}>有功功率 kW</option>
+          <option value="kva" {% if form.input_basis == 'kva' %}selected{% endif %}>视在功率 kVA</option>
+          <option value="current" {% if form.input_basis == 'current' %}selected{% endif %}>已知电流 A</option>
+        </select>
+      </label>
+      <label><span id="value-label">总输入有功功率 (kW)</span>
+        <input name="input_value" type="number" min="0" step="any" required value="{{ form.input_value or '' }}" placeholder="例如：30">
+      </label>
+      <label id="load-type-field">负荷类型（用于功率因数）
+        <select name="load_type_code" id="load-type">
+          <option value="">请选择</option>
+          {% for group in load_groups %}
+          <optgroup label="{{ group.label }}">
+            {% for item in group["items"] %}
+            <option value="{{ item.code }}" data-phases="{{ item.phases|join(',') }}" {% if form.load_type_code == item.code %}selected{% endif %}>{{ item.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+        <small>这不是需要系数。需要系数只在“安装功率”模式单独填写。</small>
+      </label>
+    </div>
+    <p id="phase-help" class="inline-help"></p>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-title">
+      <span class="wizard-number">03</span>
+      <div><p class="eyebrow">SUPPLY & ROUTE</p><h2>电源和线路</h2></div>
+    </div>
+    <div class="supply-route">
+    <div class="wizard-grid three">
+      <label>相制
+        <select name="phase" id="phase">
+          <option value="1" {% if form.phase == '1' %}selected{% endif %}>单相</option>
+          <option value="3" {% if form.phase == '3' %}selected{% endif %}>三相</option>
+        </select>
+      </label>
+      <label>电压 (V)
+        <input name="voltage_v" id="voltage" type="number" min="0" step="any" required value="{{ form.voltage_v or '' }}">
+      </label>
+      <label>敷设场景
+        <select name="installation_scenario" id="scenario">
+          <option value="conduit" data-family="BV,YJV" {% if form.installation_scenario == 'conduit' %}selected{% endif %}>穿管</option>
+          <option value="tray" data-family="YJV" {% if form.installation_scenario == 'tray' %}selected{% endif %}>槽盒</option>
+          <option value="direct_buried" data-family="YJV" {% if form.installation_scenario == 'direct_buried' %}selected{% endif %}>埋地管槽</option>
+          <option value="unknown" data-family="BV,YJV" {% if form.installation_scenario == 'unknown' %}selected{% endif %}>暂不清楚</option>
+        </select>
+      </label>
+    </div>
+    <div class="wizard-grid two supply-conductor-grid">
+      <label>导体型号
+        <select name="conductor_family" id="family">
+          <option value="BV" {% if form.conductor_family == 'BV' %}selected{% endif %}>BV-450/750V 铜芯绝缘电线</option>
+          <option value="YJV" {% if form.conductor_family == 'YJV' %}selected{% endif %}>YJV-0.6/1kV 铜芯电力电缆</option>
+        </select>
+      </label>
+      <label>导体结构 / 芯数
+        <select name="conductor_configuration" id="conductor-configuration">
+          {% for code, item in conductor_configurations.items() %}
+          <option value="{{ code }}" data-family="{{ item.family }}" data-phases="{{ item.phases|join(',') }}" {% if form.conductor_configuration == code %}selected{% endif %}>{{ item.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <p class="inline-help">BV当前只开放已有明确基础载流量表的穿管工况；线槽基础载流量依据尚未核实，暂不提供该选项。</p>
+    <div class="advanced-block" id="tray-conditions">
+      <h3>槽盒敷设条件</h3>
+      <p class="inline-help">表6.25原表采用“托盘/梯架”术语；降额取决于型式、层数及每层线缆数。当前只接入水平有孔工况。</p>
+      <div class="wizard-grid three">
+        <label>槽盒型式<select name="tray_type" id="tray-type">{% for code, label in tray_options.items() %}<option value="{{ code }}" {% if form.tray_type == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label>槽盒层数<select name="tray_layers"><option value="1" {% if form.tray_layers == '1' %}selected{% endif %}>1层</option><option value="2" {% if form.tray_layers == '2' %}selected{% endif %}>2层</option><option value="3" {% if form.tray_layers == '3' %}selected{% endif %}>3层</option><option value="6" {% if form.tray_layers == '6' %}selected{% endif %}>6层</option></select></label>
+        <label>每层相同线缆数<select name="tray_cables_per_layer"><option value="1" {% if form.tray_cables_per_layer == '1' %}selected{% endif %}>1根</option><option value="2" {% if form.tray_cables_per_layer == '2' %}selected{% endif %}>2根</option><option value="3" {% if form.tray_cables_per_layer == '3' %}selected{% endif %}>3根</option><option value="4" {% if form.tray_cables_per_layer == '4' %}selected{% endif %}>4根</option><option value="6" {% if form.tray_cables_per_layer == '6' %}selected{% endif %}>6根</option><option value="9" {% if form.tray_cables_per_layer == '9' %}selected{% endif %}>9根</option></select></label>
+      </div>
+    </div>
+    <div class="advanced-block" id="enclosed-conditions">
+      <h3>穿管成组条件</h3>
+      <p class="inline-help">仅当多回路或多根电缆相互接触，并成束、沿槽、嵌入或封闭式敷设时，按表6.26当前接入工况降额。</p>
+      <div class="wizard-grid two">
+        <label>同束/封闭通道内回路数
+          <select name="enclosed_grouping_circuit_count">
+            <option value="" {% if not form.enclosed_grouping_circuit_count %}selected{% endif %}>暂不清楚</option>
+            {% for value in [1,2,3,4,5,6,7,8,9,12,16,20] %}
+            <option value="{{ value }}" {% if form.enclosed_grouping_circuit_count == value|string %}selected{% endif %}>{{ value }}回路</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="basis-note">选择大于1即确认线缆相互接触，且尺寸和负荷相同；其他排列不直接套此系数。</div>
+      </div>
+    </div>
+    <div class="advanced-block" id="ground-conditions">
+      <h3>埋地管槽条件</h3>
+      <p class="inline-help">YJV三芯按19DX101-1表6.10“敷设在埋地的管槽内”查取；表中YJV22“敷设在土壤中”的数据不用于YJV。</p>
+      <div class="wizard-grid four">
+        <label>土壤热阻系数 [K·m/W]
+          <select name="soil_thermal_resistivity_k_m_per_w" id="soil-thermal-resistivity">
+            <option value="" {% if not form.soil_thermal_resistivity_k_m_per_w %}selected{% endif %}>请选择实际条件</option>
+            {% for value in [1, 1.5, 2, 2.5] %}
+            <option value="{{ value }}" {% if form.soil_thermal_resistivity_k_m_per_w == value|string %}selected{% endif %}>{{ value }} K·m/W</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>同路径回路数
+          <select name="buried_circuit_count" id="buried-circuit-count">
+            <option value="" {% if not form.buried_circuit_count %}selected{% endif %}>暂不清楚</option>
+            {% for value in range(1, 21) %}
+            <option value="{{ value }}" {% if form.buried_circuit_count == value|string %}selected{% endif %}>{{ value }}回路</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label id="buried-spacing-field">管槽之间距离
+          <select name="buried_duct_spacing_m">
+            <option value="" {% if not form.buried_duct_spacing_m %}selected{% endif %}>请选择实际间距</option>
+            <option value="touching" {% if form.buried_duct_spacing_m == 'touching' %}selected{% endif %}>无间距（电缆相互接触）</option>
+            <option value="0.25" {% if form.buried_duct_spacing_m == '0.25' %}selected{% endif %}>0.25 m</option>
+            <option value="0.5" {% if form.buried_duct_spacing_m == '0.5' %}selected{% endif %}>0.5 m</option>
+            <option value="1.0" {% if form.buried_duct_spacing_m == '1.0' %}selected{% endif %}>1.0 m</option>
+          </select>
+        </label>
+        <label id="buried-depth-field">埋地深度
+          <select name="buried_depth_m">
+            <option value="" {% if not form.buried_depth_m %}selected{% endif %}>暂不清楚</option>
+            <option value="0.7" {% if form.buried_depth_m == '0.7' %}selected{% endif %}>0.7 m（表6.27参考条件）</option>
+            <option value="other" {% if form.buried_depth_m == 'other' %}selected{% endif %}>其他深度（不直接套表）</option>
+          </select>
+        </label>
+      </div>
+      <p class="inline-help">土壤热阻用于表6.10基础载流量；2～20回路时按表6.27的管槽间距降额。表6.27参考条件为埋深0.7m、土壤热阻2.5 K·m/W。</p>
+    </div>
+    </div>
+  </section>
+
+  <details class="panel advanced-fields" {% if form.power_definition == 'installed' or form.power_factor or form.installation_temperature_c or form.length_m or form.short_circuit_method == 'transformer_lv_table' or form.rcd_scenario != 'unknown' or form.rcd_residual_waveform != 'unknown' %}open{% endif %}>
+    <summary>高级条件：有资料时填写，没有就明确列为待校核</summary>
+    <div class="advanced-block">
+      <h3>敷设环境温度</h3>
+      <p class="inline-help">只选择实际温度，系统按19DX101-1自动换算；不选择时仍显示基础初选，但温度校核保持未完成。</p>
+      <div class="wizard-grid two">
+        <label><span id="installation-temperature-label">环境空气温度 (℃)</span>
+          <select name="installation_temperature_c" id="installation-temperature">
+            <option value="" {% if not form.installation_temperature_c %}selected{% endif %}>暂不清楚</option>
+            {% for temperature in [10,15,20,25,30,35,40,45,50,55,60,65,70,75,80] %}
+            <option value="{{ temperature }}" {% if form.installation_temperature_c == temperature|string %}selected{% endif %}>{{ temperature }}℃</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="basis-note" id="temperature-basis-note">
+          空气中敷设采用表6.22；埋地管槽采用表6.24。系统会按所选载流量表的基准温度进行相对换算。
+        </div>
+      </div>
+    </div>
+
+    <div class="advanced-block" id="power-advanced">
+      <h3>负荷参数</h3>
+      <div class="wizard-grid three">
+        <label>输入功率性质
+          <select name="power_definition" id="power-definition">
+            <option value="design" {% if form.power_definition == 'design' %}selected{% endif %}>已经是本回路计算功率</option>
+            <option value="installed" {% if form.power_definition == 'installed' %}selected{% endif %}>安装功率，需要乘需要系数</option>
+          </select>
+          <small>单台设备按输入功率计算；需要系数仅用于同类负荷汇总、配电箱或干线。</small>
+        </label>
+        <label id="demand-field">需要系数
+          <input name="demand_factor" type="number" min="0.001" max="1" step="any" value="{{ form.demand_factor or '' }}" placeholder="不猜默认值">
+        </label>
+        <label>铭牌 / 厂家功率因数
+          <input name="power_factor" type="number" min="0.01" max="1" step="any" value="{{ form.power_factor or '' }}" placeholder="例如：0.85">
+          <small>kW 电流计算和电压降优先采用；应与可靠资料核对。</small>
+        </label>
+      </div>
+    </div>
+
+    <div class="advanced-block">
+      <h3>上级变压器资料</h3>
+      <p class="inline-help">系列、容量和uk%只填一次，供出口速查、线路末端三相短路及TN接地故障共同使用。出口速查仍按19DX101-1表15.7的适用条件处理。</p>
+      <div class="wizard-grid four">
+        <label>本回路安装位置
+          <select name="short_circuit_method" id="short-circuit-method">
+            <option value="none" {% if form.short_circuit_method != 'transformer_lv_table' %}selected{% endif %}>不是变压器低压出口 / 暂不计算</option>
+            <option value="transformer_lv_table" {% if form.short_circuit_method == 'transformer_lv_table' %}selected{% endif %}>变压器0.4kV低压出口</option>
+          </select>
+        </label>
+        <label>变压器系列
+          <select name="transformer_series_code">
+            <option value="">请选择铭牌系列</option>
+            {% for code, series in fault_transformer_series.items() %}
+            <option value="{{ code }}" {% if form.transformer_series_code == code %}selected{% endif %}>{{ series.name }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="fault_transformer_series_code" value="{{ form.transformer_series_code or form.fault_transformer_series_code or '' }}">
+          <small>一次选择，同时用于三相短路和TN接地故障查表。</small>
+        </label>
+        <label>变压器容量 (kVA)
+          <select name="transformer_capacity_kva">
+            <option value="">请选择</option>
+            {% for capacity in transformer_capacities %}
+            <option value="{{ capacity }}" {% if form.transformer_capacity_kva == capacity|string %}selected{% endif %}>{{ capacity }} kVA</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="fault_transformer_capacity_kva" value="{{ form.transformer_capacity_kva or form.fault_transformer_capacity_kva or '' }}">
+        </label>
+        <label>铭牌短路阻抗电压 uk%
+          <select name="transformer_uk_percent">
+            <option value="" {% if not form.transformer_uk_percent %}selected{% endif %}>不知道，显示表列范围</option>
+            {% for uk in [4, 4.5, 6, 7, 8] %}
+            <option value="{{ uk }}" {% if form.transformer_uk_percent == uk|string %}selected{% endif %}>{{ uk }}%</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="fault_transformer_uk_percent" value="{{ form.transformer_uk_percent or form.fault_transformer_uk_percent or '' }}">
+        </label>
+      </div>
+    </div>
+
+    <div class="advanced-block">
+      <h3>剩余电流保护条件</h3>
+      <div class="wizard-grid two">
+        <label>RCD 用途 / 场所
+          <select name="rcd_scenario">
+            <option value="unknown" {% if form.rcd_scenario == 'unknown' %}selected{% endif %}>暂不明确，不猜漏电动作值</option>
+            <option value="additional_30ma" {% if form.rcd_scenario == 'additional_30ma' %}selected{% endif %}>手持/移动、室外、家用电器或插座等附加保护</option>
+            <option value="fire_300ma" {% if form.rcd_scenario == 'fire_300ma' %}selected{% endif %}>持续接地故障引起火灾危险的防护</option>
+          </select>
+        </label>
+        <label>负载剩余电流波形
+          <select name="rcd_residual_waveform">
+            <option value="unknown" {% if form.rcd_residual_waveform == 'unknown' or not form.rcd_residual_waveform %}selected{% endif %}>暂不明确，不猜RCD类型</option>
+            <option value="ac" {% if form.rcd_residual_waveform == 'ac' %}selected{% endif %}>仅交流剩余电流</option>
+            <option value="pulsating_dc" {% if form.rcd_residual_waveform == 'pulsating_dc' %}selected{% endif %}>交流及脉动直流剩余电流</option>
+            <option value="smooth_dc" {% if form.rcd_residual_waveform == 'smooth_dc' %}selected{% endif %}>含平滑直流剩余电流</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="advanced-block">
+      <h3>电压降暂算</h3>
+      <p class="inline-help">只需填写线路长度。系统采用本次初选截面，并从已核实的19DX101-1表格自动取得 R/X。</p>
+      <div class="wizard-grid two">
+        <label>线路长度 (m)
+          <input name="length_m" type="number" min="0" step="any" value="{{ form.length_m or '' }}">
+        </label>
+        <div class="basis-note">
+          <strong>允许电压降：系统自动采用</strong><br>
+          普通低压线路 5%；供给有照明负荷的低压线路表列 3%～5%，本工具按 3% 保守暂算。依据：手册第6.2.4节、表6.2-6（PDF第497页；已核实、未批准）。
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="panel terminal-short-circuit-panel">
+    <summary>
+      <span>短路与故障保护（建设中）</span>
+      <small>变压器低压出口可速查；可填写线路末端计算资料</small>
+    </summary>
+    <div class="terminal-short-circuit-content">
+      <div class="terminal-short-circuit-intro">
+        <p class="eyebrow">LINE-END SHORT CIRCUIT</p>
+        <h2>线路末端三相短路与分断能力</h2>
+        <p>用于把“变压器低压出口”延伸到母线、电缆后的安装点。填写后会随本次表单提交；结果只作线路末端三相短路暂算，不能代替接地故障、脱扣特性或选择性校核。</p>
+      </div>
+
+      <div class="terminal-short-circuit-enable">
+        <strong>三相线路具备条件后自动计算</strong>
+        <small>系统沿用上方变压器容量、uk%、导体和线路长度；不再要求单独勾选，也不重复填写截面或R/X。</small>
+      </div>
+
+      <fieldset class="terminal-short-circuit-fields" id="terminal-short-circuit-fields">
+        <legend>末端短路必要条件</legend>
+        <p class="basis-note"><strong>系统自动推导</strong><br>变压器正序R/X及负载损耗由上方系列、容量和uk%精确查手册表；线路R/X由电缆类型、结构和系统初选截面查表；380/400V系统最大三相短路电压系数自动采用1.05。没有精确表列组合时不插值。</p>
+        <div class="wizard-grid two">
+          <label>上级系统条件
+            <select name="source_impedance_mode" id="source-impedance-mode">
+              <option value="unknown" {% if form.source_impedance_mode == 'unknown' or not form.source_impedance_mode %}selected{% endif %}>暂不明确</option>
+              <option value="infinite_capacity" {% if form.source_impedance_mode == 'infinite_capacity' %}selected{% endif %}>上级系统容量无限大</option>
+              <option value="short_circuit_capacity" {% if form.source_impedance_mode == 'short_circuit_capacity' %}selected{% endif %}>已知上级短路容量</option>
+              <option value="provided" {% if form.source_impedance_mode == 'provided' %}selected{% endif %}>已知等值阻抗</option>
+            </select>
+            <small>不默认采用“无限大”；已知短路容量时由系统折算低压侧 R/X。</small>
+          </label>
+          <div class="basis-note">
+            <strong>断路器分断能力</strong><br>
+            系统先计算安装点预期短路电流，再输出所需最小Icu；只有复核已选实物时才填写产品Icu。
+          </div>
+        </div>
+        <div class="wizard-grid two terminal-source-capacity-fields">
+          <label>上级系统短路容量 Ssc (MVA)
+            <input name="source_short_circuit_capacity_mva" type="number" min="0" step="any" value="{{ form.source_short_circuit_capacity_mva or '100' }}">
+            <small>预填100MVA作为设计条件，可按项目供电资料修改；系统按手册式(4.6-41)折算R/X。</small>
+          </label>
+        </div>
+        <div class="wizard-grid three">
+          <label>线路类型
+            <select name="short_circuit_line_type" id="short-circuit-line-type">
+              <option value="cable" {% if form.short_circuit_line_type == 'cable' or not form.short_circuit_line_type %}selected{% endif %}>电缆</option>
+              <option value="busway" {% if form.short_circuit_line_type == 'busway' %}selected{% endif %}>母线槽</option>
+            </select>
+            <small>导体型号、结构沿用“电源和线路”的选择。</small>
+          </label>
+          <label id="short-circuit-cable-section-field">短路计算电缆截面
+            <input type="text" value="自动采用本次电缆初选后的最终截面" disabled>
+            <small>系统据此从本地目录查线路R/X；既有线路复核将在后续“实际回路核验”中选择实际规格。</small>
+          </label>
+          <label>线路长度 (m)
+            <input type="text" value="沿用上方“电压降暂算”的线路长度" disabled>
+            <small>本区不重复造字段；请在上方填写。</small>
+          </label>
+        </div>
+        <div class="wizard-grid three terminal-busway-fields" id="terminal-busway-fields">
+          <label>母线槽 R (Ω/km)
+            <input name="busway_r_ohm_per_km" type="number" min="0" step="any" value="{{ form.busway_r_ohm_per_km or '' }}" placeholder="样本参数">
+          </label>
+          <label>母线槽 X (Ω/km)
+            <input name="busway_x_ohm_per_km" type="number" min="0" step="any" value="{{ form.busway_x_ohm_per_km or '' }}" placeholder="样本参数">
+          </label>
+          <label>母线槽阻抗资料来源
+            <input name="busway_impedance_reference" type="text" value="{{ form.busway_impedance_reference or '' }}" placeholder="制造商样本名称、页码或链接">
+            <small>R/X 必须来自对应型号的制造商样本。</small>
+          </label>
+        </div>
+        <details class="expert-fields">
+          <summary>专家校核：已有计算书、铭牌或产品样本时填写</summary>
+          <div class="wizard-grid three terminal-source-boundary">
+            <label>出口总等值电阻 R (Ω)<input name="upstream_r_ohm" type="number" min="0" step="any" value="{{ form.upstream_r_ohm or '' }}"></label>
+            <label>出口总等值电抗 X (Ω)<input name="upstream_x_ohm" type="number" min="0" step="any" value="{{ form.upstream_x_ohm or '' }}"></label>
+            <label>R/X 参数来源<input name="upstream_impedance_reference" type="text" value="{{ form.upstream_impedance_reference or '' }}"></label>
+          </div>
+          <div class="wizard-grid three terminal-nameplate-input">
+            <label>铭牌短路损耗 Pk (kW)<input name="transformer_pk_kw" type="number" min="0" step="any" value="{{ form.transformer_pk_kw or '' }}"></label>
+            <label>低压空载线电压 U20 (V)<input name="transformer_lv_no_load_voltage_v" type="number" min="0" step="any" value="{{ form.transformer_lv_no_load_voltage_v or '' }}"></label>
+            <label>实际产品 Icu (kA)<input name="breaker_icu_ka" type="number" min="0" step="any" value="{{ form.breaker_icu_ka or '' }}"></label>
+          </div>
+          <div class="advanced-block existing-breaker-reference-fields">
+            <h3>断路器产品参考复核</h3>
+            <p class="inline-help">默认不启用，不影响19DX101-1通用参数候选。只有明确采用下列产品系列时，才按厂家样本核对Icu、脱扣器和相导体I²t。</p>
+            <div class="wizard-grid three">
+              <label>产品系列
+                <select name="existing_breaker_series">
+                  <option value="" {% if not form.existing_breaker_series %}selected{% endif %}>不进行产品实物复核</option>
+                  <option value="SCHNEIDER.EASYPACT.CVS.2024" {% if form.existing_breaker_series == 'SCHNEIDER.EASYPACT.CVS.2024' %}selected{% endif %}>Schneider EasyPact CVS（官方样本）</option>
+                </select>
+              </label>
+              <label>现场额定电流 In (A)
+                <input name="existing_breaker_rated_current_a" type="number" min="0" step="any" value="{{ form.existing_breaker_rated_current_a or '' }}" placeholder="留空复用本页初选In">
+                <small>核对既有设备时应按铭牌填写；留空只形成产品参考候选，不能代表现场实物。</small>
+              </label>
+              <label>脱扣器
+                <select name="existing_breaker_trip_unit_family">
+                  <option value="TM-D" {% if form.existing_breaker_trip_unit_family == 'TM-D' or not form.existing_breaker_trip_unit_family %}selected{% endif %}>TM-D 配电保护</option>
+                  <option value="ETS" {% if form.existing_breaker_trip_unit_family == 'ETS' %}selected{% endif %}>ETS 电子式配电保护</option>
+                </select>
+                <small>不提供电动机保护MA选项。</small>
+              </label>
+            </div>
+          </div>
+          <input type="hidden" name="breaker_installation_point" value="line_start">
+          <input type="hidden" name="voltage_factor_c" value="{{ form.voltage_factor_c or '1.05' }}">
+          <div class="wizard-grid two terminal-source-impedance-fields">
+            <label>上级系统等值电阻 R (Ω)<input name="source_r_ohm" type="number" min="0" step="any" value="{{ form.source_r_ohm or '' }}"></label>
+            <label>上级系统等值电抗 X (Ω)<input name="source_x_ohm" type="number" min="0" step="any" value="{{ form.source_x_ohm or '' }}"></label>
+          </div>
+        </details>
+      </fieldset>
+
+      <div class="earth-fault-subsection">
+        <div class="terminal-short-circuit-enable">
+          <label><input id="earth-fault-enabled" type="checkbox" name="earth_fault_enabled" value="true" {% if form.earth_fault_enabled %}checked{% endif %}> <span>进行TN接地故障与自动切断暂算</span></label>
+          <small>系统先由变压器、连接段和线路自动计算Zs、故障电流及保护器件允许的最大Ia；实际产品曲线或整定值确认后，再形成自动切断结论。</small>
+        </div>
+        <fieldset class="terminal-short-circuit-fields" id="earth-fault-fields">
+          <legend>TN自动切断：只确认工程事实</legend>
+          <div class="wizard-grid two">
+            <div class="basis-note">
+              <strong>变压器资料沿用上方一次填写</strong><br>
+              系统分别查正序阻抗和相—PE阻抗。当前表列路径限10/0.4kV、Dyn11；实际铭牌不符时停止自动计算。
+              <input type="hidden" name="fault_transformer_hv_voltage_kv" value="10">
+              <input type="hidden" name="fault_transformer_vector_group" value="Dyn11">
+            </div>
+            <label id="fault-protective-core-field">所选YJV保护芯确认
+              <select id="fault-protective-core-role" name="fault_fourth_conductor_role">
+                <option value="">请选择</option>
+                <option value="PE" {% if form.fault_fourth_conductor_role == 'PE' %}selected{% endif %}>表列小截面芯确认为PE保护导体</option>
+                <option value="N" {% if form.fault_fourth_conductor_role == 'N' %}selected{% endif %}>作为N或尚未确认（另设PE）</option>
+              </select>
+              <small id="fault-protective-core-note">四芯电缆可能是3L+PE或3L+N，必须按图纸确认；五芯设计初选由系统按一芯PE自动带入。</small>
+            </label>
+          </div>
+          <div class="wizard-grid four">
+            <label>变压器至低压总柜连接
+              <select name="fault_connection_type" id="fault-connection-type">
+                <option value="direct" {% if form.fault_connection_type != 'busway' %}selected{% endif %}>线路直接接自变压器低压端子</option>
+                <option value="busway" {% if form.fault_connection_type == 'busway' %}selected{% endif %}>经母线槽接至低压总柜</option>
+              </select>
+            </label>
+            <label class="fault-busway-field">母线槽相—PE参数目录
+              <select name="fault_busway_series_code">
+                <option value="">没有对应产品 / 手工填写R/X</option>
+                {% for code, series in busway_phase_pe_series.items() %}
+                <option value="{{ code }}" {% if form.fault_busway_series_code == code %}selected{% endif %}>{{ series.name }}</option>
+                {% endfor %}
+              </select>
+              <small>仅限施耐德官方目录中的精确系列和PE结构；不能把外壳PE与内部PE混用。</small>
+            </label>
+            <label class="fault-busway-field">母线槽额定电流 (A)
+              <select name="fault_busway_rating_a">
+                <option value="">请选择精确额定电流</option>
+                {% for rating in busway_phase_pe_ratings %}
+                <option value="{{ rating|int }}" {% if form.fault_busway_rating_a == rating|int|string %}selected{% endif %}>{{ rating|int }} A</option>
+                {% endfor %}
+              </select>
+              <small>非所选系列的表列档位会判为无匹配，不插值。</small>
+            </label>
+            <label class="fault-busway-field">母线槽长度 (m)
+              <input name="fault_connection_length_m" type="number" min="0" step="any" value="{{ form.fault_connection_length_m or '' }}">
+            </label>
+            <details class="fault-busway-field expert-fields">
+              <summary>专家补录：目录没有对应母线槽时填写R/X</summary>
+              <div class="wizard-grid two">
+                <label>母线槽相保 R / X (Ω/km)
+                  <span class="inline-pair">
+                    <input name="fault_connection_r_ohm_per_km" type="number" min="0" step="any" value="{{ form.fault_connection_r_ohm_per_km or '' }}" placeholder="R">
+                    <input name="fault_connection_x_ohm_per_km" type="number" min="0" step="any" value="{{ form.fault_connection_x_ohm_per_km or '' }}" placeholder="X">
+                  </span>
+                </label>
+                <label>母线槽 R/X 来源
+                  <input name="fault_connection_impedance_reference" type="text" value="{{ form.fault_connection_impedance_reference or '' }}" placeholder="厂家样本名称及页码">
+                </label>
+              </div>
+              <small>选择上方目录后由系统自动取得相—PE R/X和来源；只有目录无对应产品时才手工填写。</small>
+            </details>
+          </div>
+          <div class="wizard-grid four">
+            <label>接地系统
+              <select name="earthing_system">
+                <option value="TN-S" {% if form.earthing_system == 'TN-S' or not form.earthing_system %}selected{% endif %}>TN-S</option>
+                <option value="TN-C-S" {% if form.earthing_system == 'TN-C-S' %}selected{% endif %}>TN-C-S</option>
+              </select>
+            </label>
+            <label>相导体对地标称电压 U₀ (V)
+              <input id="nominal-line-to-earth-voltage" type="text" value="{{ form.nominal_line_to_earth_voltage_v or '—' }}" readonly>
+              <small id="nominal-line-to-earth-voltage-note">由上方相制及系统电压自动带入，不重复填写。</small>
+            </label>
+            <label>回路用途
+              <select name="circuit_application">
+                <option value="">请选择</option>
+                <option value="socket_final" {% if form.circuit_application == 'socket_final' %}selected{% endif %}>插座终端回路</option>
+                <option value="fixed_equipment_final" {% if form.circuit_application == 'fixed_equipment_final' %}selected{% endif %}>固定设备终端回路</option>
+                <option value="distribution" {% if form.circuit_application == 'distribution' %}selected{% endif %}>配电回路</option>
+              </select>
+            </label>
+            <label>回路额定电流 (A)
+              <input type="text" value="{{ form.circuit_rated_current_a or '自动采用断路器初选 In' }}" readonly>
+              <small>系统采用本次断路器候选In判断终端回路边界；既有回路核验可改用实际In。</small>
+            </label>
+          </div>
+          <details class="expert-fields">
+            <summary>专家复核：已有Zs、保护曲线或热稳定资料时填写</summary>
+          <div class="wizard-grid three">
+            <label>故障回路阻抗 Zs (Ω，可选)
+              <input name="fault_loop_impedance_ohm" type="number" min="0" step="any" value="{{ form.fault_loop_impedance_ohm or '' }}">
+              <small>填写后优先采用有来源的完整Zs；留空时，YJV四芯可按变压器+连接段+线路自动计算，其他已支持结构退回TN常规法。</small>
+            </label>
+            <label>Zs 来源（填写Zs时必填）
+              <input name="fault_loop_impedance_reference" type="text" value="{{ form.fault_loop_impedance_reference or '' }}" placeholder="计算书、实测记录、资料页码">
+            </label>
+            <label>保护方式
+              <select name="protection_type" id="earth-fault-protection-type">
+                <option value="overcurrent" {% if form.protection_type == 'overcurrent' or not form.protection_type %}selected{% endif %}>过电流保护器</option>
+                <option value="rcd" {% if form.protection_type == 'rcd' %}selected{% endif %}>RCD</option>
+              </select>
+            </label>
+          </div>
+          <div class="wizard-grid three">
+            <label>保护器件动作特性
+              <select name="protective_device_characteristic">
+                <option value="manual" {% if form.protective_device_characteristic == 'manual' or not form.protective_device_characteristic %}selected{% endif %}>手工填写Ia</option>
+                <option value="mcb_b" {% if form.protective_device_characteristic == 'mcb_b' %}selected{% endif %}>MCB B型（按5In）</option>
+                <option value="mcb_c" {% if form.protective_device_characteristic == 'mcb_c' %}selected{% endif %}>MCB C型（按10In）</option>
+              </select>
+              <small>D型MCB及MCCB的产品曲线/整定归入后续电动机模块；本页只自动采用B/C型MCB。</small>
+            </label>
+            <label>断路器额定电流 In (A)
+              <input name="protective_device_rated_current_a" type="number" min="0" step="any" value="{{ form.protective_device_rated_current_a or '' }}" placeholder="B/C型留空可采用本页MCB候选值">
+            </label>
+            <label>规定时间内动作电流 Ia (A)
+              <input name="protective_device_operating_current_a" type="number" min="0" step="any" value="{{ form.protective_device_operating_current_a or '' }}" placeholder="B/C型可自动计算">
+            </label>
+          </div>
+          <div class="wizard-grid two">
+            <label>Ia 来源（手工填写Ia时必填）
+              <input name="protective_device_operating_reference" type="text" value="{{ form.protective_device_operating_reference or '' }}" placeholder="产品曲线/样本及对应时间">
+            </label>
+            <label id="rcd-pen-split-field"><span>TN-C-S的RCD位置确认</span>
+              <span class="checkbox-line"><input name="rcd_downstream_of_pen_split" type="checkbox" value="true" {% if form.rcd_downstream_of_pen_split %}checked{% endif %}> 位于N线与PE线分开后的部分</span>
+            </label>
+          </div>
+          <div class="advanced-block">
+            <p class="basis-note"><strong>热稳定约束由系统自动形成</strong><br>相导体复用线路起点最大三相短路电流；PE复用末端接地故障电流和已确认的PE截面。未选具体保护器件时先输出最大允许切除时间和最大I²t。</p>
+            <div class="wizard-grid three">
+              <label>故障切除时间 t (s)
+                <input name="fault_clearing_time_s" type="number" min="0" max="5" step="any" value="{{ form.fault_clearing_time_s or '' }}" placeholder="来自保护器件曲线，且≤5s">
+              </label>
+              <label>保护器件通过能量 I²t (A²·s，可选)
+                <input name="let_through_energy_a2s" type="number" min="0" step="any" value="{{ form.let_through_energy_a2s or '' }}" placeholder="有产品限流曲线时优先填写">
+              </label>
+              <label>I²t 来源（填写I²t时必填）
+                <input name="let_through_energy_reference" type="text" value="{{ form.let_through_energy_reference or '' }}" placeholder="制造商样本、曲线及页码">
+              </label>
+            </div>
+          </div>
+          </details>
+        </fieldset>
+      </div>
+
+      <div class="terminal-short-circuit-preview" aria-label="线路末端短路计算状态">
+        {% if result and result.line_end_short_circuit %}
+        <article><span>线路末端三相短路电流 Ik</span><strong>已自动计算</strong><small>在下方“线路末端三相短路暂算”查看结果</small></article>
+        <article><span>断路器分断能力</span><strong>暂算待查看</strong><small>系统输出安装点所需最小Icu</small></article>
+        {% else %}
+        <article><span>线路末端三相短路电流 Ik</span><strong>等待条件</strong><small>补齐变压器系列、容量、uk%及线路长度后自动计算</small></article>
+        <article><span>断路器分断能力</span><strong>待计算</strong><small>无需预先填写Icu，先计算最低要求</small></article>
+        {% endif %}
+        <article><span>TN-S / TN-C-S 接地故障</span><strong>{% if form.earth_fault_enabled %}已启用{% else %}按需启用{% endif %}</strong><small>系统自动计算故障电流和最大允许Ia，并同时校核B/C型MCB参数候选</small></article>
+        <article><span>RCD</span><strong>下一步</strong><small>需按用途、场所及产品参数校核</small></article>
+      </div>
+      <p class="basis-note"><strong>当前边界</strong><br>YJV四芯/五芯、相线与PE在同一电缆内且截面不超过120mm²时，可按施耐德TN常规法自动计算保守的最小接地故障电流；也可优先填写有来源的完整Zs。保护器件Ia、脱扣特性和选择性仍须按产品曲线校核，结果仍是非正式结论。</p>
+    </div>
+  </details>
+
+  <button type="submit" class="calculate-button">开始连续计算</button>
+</form>
+
+{% if result %}
+<section class="quick-output">
+  <section class="workflow-strip" aria-label="完整回路计算进度">
+    {% for stage in result.outputs.workflow_stages or [] %}
+    <article class="workflow-stage state-{{ stage.state }}">
+      <span>{{ "%02d"|format(loop.index) }}</span>
+      <strong>{{ stage.label }}</strong>
+      <small>
+        {% if stage.state == "completed" %}已计算
+        {% elif stage.state == "candidate" %}已有候选
+        {% elif stage.state == "minimum" %}仅给出最低要求
+        {% else %}等待必要参数{% endif %}
+      </small>
+    </article>
+    {% endfor %}
+  </section>
+
+  <div class="quick-result-grid circuit-results">
+    <article><span>计算电流</span><strong>{% if result.outputs.design_current_a is defined %}{{ result.outputs.design_current_a }} A{% else %}无法判断{% endif %}</strong></article>
+    <article><span>断路器最低额定电流</span><strong>{% if result.outputs.required_breaker_rating_a is defined %}≥ {{ result.outputs.required_breaker_rating_a }} A{% else %}—{% endif %}</strong></article>
+    <article><span>导体最低基础载流量</span><strong>{% if result.outputs.required_cable_ampacity_a is defined %}≥ {{ result.outputs.required_cable_ampacity_a }} A{% else %}—{% endif %}</strong></article>
+    <article><span>基础计算状态</span><strong class="{% if result.provisional_status == '通过' %}pass-text{% else %}unknown-text{% endif %}">{{ result.provisional_status }}</strong></article>
+    <article><span>完整正式状态</span><strong class="unknown-text">{{ result.status }}</strong></article>
+  </div>
+
+  {% if result.outputs.phase_application %}
+  <section class="alert warning"><strong>三相汇总说明</strong><span>{{ result.outputs.phase_application }}</span></section>
+  {% endif %}
+
+  {% if result.outputs.short_circuit_estimate %}
+  <section class="panel candidate-panel">
+    <div class="section-title">
+      <div><p class="eyebrow">SHORT CIRCUIT</p><h2>变压器0.4kV出口短路暂算</h2></div>
+      <span class="status-pill pending">已核实表格 · 未批准</span>
+    </div>
+    <dl class="parameter-grid">
+      <div><dt>计算位置</dt><dd>{{ result.outputs.short_circuit_estimate.location }}</dd></div>
+      <div><dt>变压器容量</dt><dd>{{ result.outputs.short_circuit_estimate.transformer_capacity_kva }} kVA</dd></div>
+      {% if result.outputs.short_circuit_estimate.mode == 'exact_table' %}
+      <div><dt>铭牌 uk%</dt><dd>{{ result.outputs.short_circuit_estimate.transformer_uk_percent }}%</dd></div>
+      <div><dt>三相短路电流 Ik</dt><dd>{{ result.outputs.short_circuit_estimate.ik_ka }} kA</dd></div>
+      <div><dt>短路峰值 ip</dt><dd>{{ result.outputs.short_circuit_estimate.ip_ka }} kA</dd></div>
+      {% else %}
+      <div><dt>表列 uk%</dt><dd>{{ result.outputs.short_circuit_estimate.available_uk_percent|join(' / ') }}%</dd></div>
+      <div><dt>三相短路电流范围</dt><dd>{{ result.outputs.short_circuit_estimate.ik_min_ka }}～{{ result.outputs.short_circuit_estimate.ik_max_ka }} kA</dd></div>
+      <div><dt>分断能力暂按</dt><dd>≥ {{ result.outputs.short_circuit_estimate.adopted_for_breaking_capacity_ka }} kA</dd></div>
+      {% endif %}
+      <div><dt>资料定位</dt><dd>{{ result.outputs.short_circuit_estimate.source }} · {{ result.outputs.short_circuit_estimate.table }} · {{ result.outputs.short_circuit_estimate.page }}</dd></div>
+    </dl>
+    <p class="basis-note">{{ result.outputs.short_circuit_estimate.assumption }}；结果仅适用于变压器低压出口，线路末端短路电流仍需计入线路阻抗。</p>
+  </section>
+  {% endif %}
+
+  {% if result.line_end_short_circuit %}
+  {% set line_sc = result.line_end_short_circuit %}
+  {% set line_sc_outputs = line_sc.outputs or {} %}
+  {% set upstream = line_sc_outputs.upstream_impedance or {} %}
+  {% set transformer = upstream.transformer_equivalent or {} %}
+  {% set source = upstream.source_equivalent or {} %}
+  {% set line = line_sc_outputs.line_impedance or {} %}
+  {% set icu = line_sc_outputs.breaker_icu_check or {} %}
+  <section class="panel candidate-panel line-short-circuit-result">
+    <div class="section-title">
+      <div><p class="eyebrow">LINE-END SHORT CIRCUIT</p><h2>线路末端三相短路暂算</h2></div>
+      <span class="status-pill pending">非正式结论</span>
+    </div>
+    <p class="basis-note"><strong>计算范围</strong><br>{{ line_sc_outputs.scope or '无法判断' }}<br>{{ line_sc_outputs.formal_status_note or '计算依据尚未批准，本区不产生正式结论。' }}</p>
+
+    <dl class="parameter-grid line-short-circuit-summary">
+      <div><dt>暂算状态</dt><dd class="unknown-text">{{ line_sc.provisional_status or '无法判断' }}</dd></div>
+      <div><dt>正式状态</dt><dd class="unknown-text">{{ line_sc.status or '无法判断' }}</dd></div>
+      <div><dt>线路起点最大三相短路电流</dt><dd>{% if line_sc_outputs.line_start_short_circuit_current_ka is defined %}{{ line_sc_outputs.line_start_short_circuit_current_ka }} kA{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>线路末端三相短路电流 Ik</dt><dd>{% if line_sc_outputs.terminal_short_circuit_current_ka is defined %}{{ line_sc_outputs.terminal_short_circuit_current_ka }} kA{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>馈线断路器所需最小 Icu</dt><dd>{% if line_sc_outputs.required_breaking_capacity_ka is defined %}≥ {{ line_sc_outputs.required_breaking_capacity_ka }} kA（线路起点）{% else %}无法判断{% endif %}</dd></div>
+      {% if icu.breaker_icu_ka is defined %}<div><dt>已选产品 Icu 校核</dt><dd>{{ icu.breaker_icu_ka }} kA 与 {{ icu.prospective_short_circuit_ka }} kA · {{ icu.provisional_status }}</dd></div>{% endif %}
+    </dl>
+
+    <div class="line-short-circuit-details">
+      <section>
+        <h3>阻抗组成</h3>
+        <dl class="parameter-grid line-short-circuit-impedance">
+          <div><dt>变压器 R / X</dt><dd>{% if transformer.resistance_ohm is defined %}{{ transformer.resistance_ohm }} / {{ transformer.reactance_ohm }} Ω{% else %}无法判断{% endif %}</dd></div>
+          {% if transformer.lv_no_load_voltage_v is defined %}<div><dt>变压器 U20</dt><dd>{{ transformer.lv_no_load_voltage_v }} V（{{ transformer.lv_no_load_voltage_method }}）</dd></div>{% endif %}
+          <div><dt>上级系统 R / X</dt><dd>{% if source.resistance_ohm is defined %}{{ source.resistance_ohm }} / {{ source.reactance_ohm }} Ω{% else %}无法判断{% endif %}</dd></div>
+          {% if upstream.resistance_ohm is defined %}<div><dt>出口总 R / X</dt><dd>{{ upstream.resistance_ohm }} / {{ upstream.reactance_ohm }} Ω</dd></div>{% endif %}
+          <div><dt>线路 R / X</dt><dd>{% if line.resistance_ohm is defined %}{{ line.resistance_ohm }} / {{ line.reactance_ohm }} Ω{% else %}无法判断{% endif %}</dd></div>
+          {% if line.resistance_ohm_per_km is defined %}<div><dt>线路单位 R / X</dt><dd>{{ line.resistance_ohm_per_km }} / {{ line.reactance_ohm_per_km }} Ω/km</dd></div>{% endif %}
+          {% if line.source %}<div><dt>线路参数依据</dt><dd>{{ line.source.source or line.source.reference or line.source.table or '已提供参数' }}</dd></div>{% endif %}
+        </dl>
+      </section>
+      <section>
+        <h3>断路器与依据</h3>
+        <dl class="parameter-grid line-short-circuit-impedance">
+          <div><dt>断路器安装点</dt><dd>{% if icu.installation_point == 'line_start' %}线路起点{% elif icu.installation_point == 'line_end' %}线路末端{% else %}{{ icu.installation_point or '无法判断' }}{% endif %}</dd></div>
+          <div><dt>本次采用电压系数 c</dt><dd>{{ line_sc_outputs.voltage_factor_c or '无法判断' }}</dd></div>
+          <div><dt>依据编号</dt><dd>{{ line_sc.rule_codes|join(' / ') if line_sc.rule_codes else '无法判断' }}</dd></div>
+          <div><dt>未纳入本次暂算</dt><dd>TN-S/TN-C-S接地故障、脱扣特性、选择性</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="line-short-circuit-trace">
+      <h3>过程步骤</h3>
+      <div class="trace">
+        {% for step in line_sc.steps %}
+        <article><span class="step-no">{{ "%02d"|format(loop.index) }}</span><div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div><strong>{{ step.value if step.value is not none else '无法判断' }} {{ step.unit }}</strong></article>
+        {% else %}
+        <div class="empty"><strong>无法判断</strong><p>缺少计算所需参数，或该回路不适用三相线路末端短路暂算。</p></div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="alert warning line-short-circuit-warnings"><strong>暂算警告</strong><ul>{% for warning in line_sc.warnings %}<li>{{ warning }}</li>{% else %}<li>无引擎返回警告。</li>{% endfor %}</ul></section>
+  </section>
+  {% endif %}
+
+  {% if result.earth_fault %}
+  {% set earth = result.earth_fault %}
+  {% set earth_outputs = earth.outputs or {} %}
+  <section class="panel candidate-panel earth-fault-result">
+    <div class="section-title">
+      <div><p class="eyebrow">TN EARTH FAULT</p><h2>接地故障与自动切断暂算</h2></div>
+      <span class="status-pill pending">非正式结论</span>
+    </div>
+    <dl class="parameter-grid">
+      <div><dt>暂算状态</dt><dd>{{ earth.provisional_status }}</dd></div>
+      <div><dt>正式状态</dt><dd class="unknown-text">{{ earth.status }}</dd></div>
+      <div><dt>最长切断时间</dt><dd>{% if earth_outputs.maximum_disconnection_time_s is defined %}{{ earth_outputs.maximum_disconnection_time_s }} s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>预期接地故障电流</dt><dd>{% if earth_outputs.prospective_earth_fault_current_a is defined %}{{ earth_outputs.prospective_earth_fault_current_a }} A{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>保护器件允许的最大 Ia</dt><dd>{% if earth_outputs.maximum_permitted_operating_current_a is defined %}≤ {{ earth_outputs.maximum_permitted_operating_current_a }} A{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>计算方法</dt><dd>{% if earth_outputs.fault_current_calculation_method == 'tn_conventional' %}TN常规法{% elif earth_outputs.fault_current_calculation_method == 'complete_loop_impedance' %}完整Zs法{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>U₀</dt><dd>{% if earth_outputs.nominal_line_to_earth_voltage_v is defined %}{{ earth_outputs.nominal_line_to_earth_voltage_v }} V（{{ earth_outputs.nominal_line_to_earth_voltage_source or '由系统电压自动带入' }}）{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>回路额定电流</dt><dd>{% if earth_outputs.circuit_rated_current_a is defined %}{{ earth_outputs.circuit_rated_current_a }} A（{{ earth_outputs.circuit_rated_current_source or '无法判断' }}）{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>保护芯采用</dt><dd>{{ earth_outputs.protective_core_role or '无法判断' }}（{{ earth_outputs.protective_core_role_source or '无法判断' }}）</dd></div>
+      <div><dt>允许的最大回路参数</dt><dd>{% if earth_outputs.maximum_permitted_loop_impedance_ohm is defined %}Zs ≤ {{ earth_outputs.maximum_permitted_loop_impedance_ohm }} Ω{% elif earth_outputs.maximum_permitted_line_loop_resistance_ohm is defined %}Rloop ≤ {{ earth_outputs.maximum_permitted_line_loop_resistance_ohm }} Ω{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>切断时间适用条件</dt><dd>{{ earth_outputs.disconnection_time_basis or '无法判断' }}</dd></div>
+      {% if earth_outputs.conventional_method %}<div><dt>常规法依据</dt><dd>{{ earth_outputs.conventional_method.source }} · {{ earth_outputs.conventional_method.section }} · {{ earth_outputs.conventional_method.page }}</dd></div>{% endif %}
+      {% if earth_outputs.calculated_fault_loop_chain %}
+      {% set chain_outputs = earth_outputs.calculated_fault_loop_chain.outputs or {} %}
+      <div><dt>完整回路目标点</dt><dd>{{ chain_outputs.target_point_name or '无法判断' }}</dd></div>
+      <div><dt>完整回路 R / X / Zs</dt><dd>{% if chain_outputs.fault_loop_impedance_ohm is defined %}{{ chain_outputs.fault_loop_total_resistance_ohm }} / {{ chain_outputs.fault_loop_total_reactance_ohm }} / {{ chain_outputs.fault_loop_impedance_ohm }} Ω{% else %}无法判断{% endif %}</dd></div>
+      {% endif %}
+      {% if result.busway_phase_pe_selection %}
+      <div><dt>母线槽相—PE参数</dt><dd>{{ result.busway_phase_pe_selection.series_name }} · {{ result.busway_phase_pe_selection.rating_a }} A · R={{ result.busway_phase_pe_selection.resistance_ohm_per_km }} Ω/km · X={{ result.busway_phase_pe_selection.reactance_ohm_per_km }} Ω/km</dd></div>
+      <div><dt>母线槽参数依据</dt><dd>{{ result.busway_phase_pe_selection.document_reference }} · {{ result.busway_phase_pe_selection.page }} · {{ result.busway_phase_pe_selection.condition }}</dd></div>
+      {% endif %}
+      {% if earth_outputs.protective_device_characteristic %}<div><dt>保护器件动作参数</dt><dd>MCB {{ earth_outputs.protective_device_characteristic.curve }}型，In={{ earth_outputs.protective_device_characteristic.rated_current_a }} A，Ia={{ earth_outputs.protective_device_characteristic.operating_current_a }} A（{{ earth_outputs.protective_device_characteristic.selection_note }}）</dd></div>{% endif %}
+    </dl>
+    {% if earth_outputs.protective_device_curve_candidates %}
+    <div class="selection-grid">
+      {% for candidate in earth_outputs.protective_device_curve_candidates %}
+      <article class="candidate-card">
+        <span class="eyebrow">MCB {{ candidate.curve }} CURVE</span>
+        <h3>{{ candidate.curve }}型参数候选 · In {{ candidate.rated_current_a }} A</h3>
+        <p>保证动作电流 Ia = {{ candidate.guaranteed_operating_multiplier }}In = {{ candidate.operating_current_a }} A</p>
+        <p>本回路要求 Ia ≤ {{ candidate.maximum_permitted_operating_current_a }} A</p>
+        <strong>参数候选暂算：{{ candidate.provisional_status }}</strong>
+        <small>{{ candidate.source }}</small>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="basis-note">{{ earth_outputs.protective_device_selection_note }}</p>
+    {% endif %}
+    <div class="trace">
+      {% for step in earth.steps %}
+      <article><span class="step-no">{{ "%02d"|format(loop.index) }}</span><div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div><strong>{{ step.value }} {{ step.unit }}</strong></article>
+      {% endfor %}
+    </div>
+    <section class="alert warning"><strong>暂算警告</strong><ul>{% for warning in earth.warnings %}<li>{{ warning }}</li>{% else %}<li>无引擎返回警告。</li>{% endfor %}</ul></section>
+  </section>
+  {% endif %}
+
+  {% if result.phase_thermal %}
+  {% set phase_thermal = result.phase_thermal %}
+  {% set phase_outputs = phase_thermal.outputs or {} %}
+  <section class="panel candidate-panel phase-thermal-result">
+    <div class="section-title">
+      <div><p class="eyebrow">PHASE THERMAL WITHSTAND</p><h2>相导体短路热稳定暂算</h2></div>
+      <span class="status-pill pending">非正式结论</span>
+    </div>
+    <p class="basis-note">本项复核电缆相导体截面承受线路起点最大三相短路热应力的能力；它独立于载流量、电压降和PE热稳定校核。</p>
+    <dl class="parameter-grid">
+      <div><dt>暂算状态</dt><dd>{{ phase_thermal.provisional_status }}</dd></div>
+      <div><dt>正式状态</dt><dd class="unknown-text">{{ phase_thermal.status }}</dd></div>
+      <div><dt>相导体截面</dt><dd>{% if phase_outputs.phase_conductor_section_mm2 is defined %}{{ phase_outputs.phase_conductor_section_mm2 }} mm²{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>k值</dt><dd>{% if phase_outputs.k_a_sqrt_s_per_mm2 is defined %}{{ phase_outputs.k_a_sqrt_s_per_mm2 }} A·√s/mm²{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>线路起点最大三相短路电流</dt><dd>{% if phase_outputs.prospective_phase_short_circuit_current_a is defined %}{{ phase_outputs.prospective_phase_short_circuit_current_a }} A{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>故障热应力</dt><dd>{% if phase_outputs.actual_thermal_stress_a2s is defined %}{{ phase_outputs.actual_thermal_stress_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>相导体允许热应力</dt><dd>{% if phase_outputs.permitted_thermal_stress_a2s is defined %}{{ phase_outputs.permitted_thermal_stress_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>最大允许切除时间</dt><dd>{% if phase_outputs.maximum_permitted_clearing_time_s is defined %}≤ {{ phase_outputs.maximum_permitted_clearing_time_s }} s{% else %}待产品曲线{% endif %}</dd></div>
+      <div><dt>切除时间控制依据</dt><dd>{{ phase_outputs.clearing_time_governing_basis or '无法判断' }}</dd></div>
+      <div><dt>最大允许通过能量</dt><dd>{% if phase_outputs.maximum_permitted_let_through_energy_a2s is defined %}I²t ≤ {{ phase_outputs.maximum_permitted_let_through_energy_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      {% if phase_outputs.prospective_phase_short_circuit_source %}<div><dt>短路电流依据</dt><dd>{{ phase_outputs.prospective_phase_short_circuit_source }}</dd></div>{% endif %}
+      {% if phase_outputs.source %}<div><dt>热稳定计算依据</dt><dd>{{ phase_outputs.source }} · {{ phase_outputs.section }} · {{ phase_outputs.pages }}</dd></div>{% endif %}
+    </dl>
+    <div class="trace">
+      {% for step in phase_thermal.steps %}
+      <article><span class="step-no">{{ "%02d"|format(loop.index) }}</span><div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div><strong>{{ step.value }} {{ step.unit }}</strong></article>
+      {% endfor %}
+    </div>
+    <section class="alert warning"><strong>暂算警告</strong><ul>{% for warning in phase_thermal.warnings %}<li>{{ warning }}</li>{% else %}<li>无引擎返回警告。</li>{% endfor %}</ul></section>
+  </section>
+  {% endif %}
+
+  {% if result.existing_breaker_product_reference %}
+  {% set product = result.existing_breaker_product_reference %}
+  {% set product_thermal = result.existing_breaker_phase_thermal or {} %}
+  <section class="panel candidate-panel existing-breaker-product-result">
+    <div class="section-title">
+      <div><p class="eyebrow">PRODUCT REFERENCE REVIEW</p><h2>断路器产品参考复核</h2></div>
+      <span class="status-pill pending">产品样本参考 · 非通用推荐</span>
+    </div>
+    {% if product.frame_code %}
+    <dl class="parameter-grid">
+      <div><dt>产品系列</dt><dd>{{ product.manufacturer }} {{ product.series }}</dd></div>
+      <div><dt>框架</dt><dd>{{ product.frame_code }} · {{ product.frame_rating_a }} A</dd></div>
+      <div><dt>额定电流 In</dt><dd>{{ product.rated_current_a }} A（{{ product.rated_current_source }}）</dd></div>
+      <div><dt>分断能力等级</dt><dd>{{ product.performance_level }} · Icu/Ics {{ product.icu_ka }} kA（按本次所需Icu匹配）</dd></div>
+      <div><dt>脱扣器</dt><dd>
+        {{ product.trip_unit_family }} ·
+        {% if product.trip_configuration.instantaneous_pickup_a is defined %}
+          瞬时脱扣值 {{ product.trip_configuration.instantaneous_pickup_a }} A
+        {% elif product.trip_configuration.instantaneous_pickup_range_a is defined %}
+          瞬时整定范围 {{ product.trip_configuration.instantaneous_pickup_range_a[0] }}～{{ product.trip_configuration.instantaneous_pickup_range_a[1] }} A
+        {% else %}
+          参数无法判断
+        {% endif %}
+        {% if product.trip_configuration.instantaneous_maximum_break_time_ms is defined %}
+          · 最大分断时间 {{ product.trip_configuration.instantaneous_maximum_break_time_ms }} ms（{{ product.trip_configuration.maximum_break_time_condition }}）
+        {% endif %}
+      </dd></div>
+      <div><dt>Icu暂算</dt><dd>{% if product_thermal.selected_icu_ka is defined %}{{ product_thermal.selected_icu_ka }} kA ≥ {{ product_thermal.prospective_short_circuit_current_ka }} kA{% else %}{{ product.reason }}{% endif %}</dd></div>
+      <div><dt>断路器保守通过能量</dt><dd>{% if product_thermal.breaker_conservative_let_through_i2t_a2s is defined %}{{ product_thermal.breaker_conservative_let_through_i2t_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>电缆允许热应力</dt><dd>{% if product_thermal.permitted_cable_i2t_a2s is defined %}{{ product_thermal.permitted_cable_i2t_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>相导体热稳定暂算</dt><dd>{{ product_thermal.provisional_status or '无法判断' }}</dd></div>
+      <div><dt>正式状态</dt><dd class="unknown-text">{{ product_thermal.status or product.status }}</dd></div>
+      <div><dt>依据</dt><dd>{{ product.characteristics_reference }}；{{ product.trip_reference }}；{{ product_thermal.source_reference or 'D-11图线待适用范围判断' }}</dd></div>
+    </dl>
+    <p class="basis-note">{{ product_thermal.reason or product.reason }} 性能等级由本次所需Icu自动匹配；用于核对现场设备时，仍须确认铭牌额定电流、性能等级和脱扣器。</p>
+    {% else %}
+    <section class="alert warning"><strong>无法形成产品复核</strong><span>{{ product.reason }}</span></section>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if result.pe_thermal %}
+  {% set pe = result.pe_thermal %}
+  {% set pe_outputs = pe.outputs or {} %}
+  <section class="panel candidate-panel pe-thermal-result">
+    <div class="section-title">
+      <div><p class="eyebrow">PE THERMAL WITHSTAND</p><h2>PE导体短路热稳定暂算</h2></div>
+      <span class="status-pill pending">非正式结论</span>
+    </div>
+    <dl class="parameter-grid">
+      <div><dt>暂算状态</dt><dd>{{ pe.provisional_status }}</dd></div>
+      <div><dt>正式状态</dt><dd class="unknown-text">{{ pe.status }}</dd></div>
+      <div><dt>PE截面</dt><dd>{% if pe_outputs.protective_conductor_section_mm2 is defined %}{{ pe_outputs.protective_conductor_section_mm2 }} mm²{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>k值</dt><dd>{% if pe_outputs.k_a_sqrt_s_per_mm2 is defined %}{{ pe_outputs.k_a_sqrt_s_per_mm2 }} A·√s/mm²{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>故障热应力</dt><dd>{% if pe_outputs.actual_thermal_stress_a2s is defined %}{{ pe_outputs.actual_thermal_stress_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>PE允许热应力</dt><dd>{% if pe_outputs.permitted_thermal_stress_a2s is defined %}{{ pe_outputs.permitted_thermal_stress_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>本次接地故障电流</dt><dd>{% if pe_outputs.prospective_fault_current_a is defined %}{{ pe_outputs.prospective_fault_current_a }} A{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>最大允许切除时间</dt><dd>{% if pe_outputs.maximum_permitted_clearing_time_s is defined %}≤ {{ pe_outputs.maximum_permitted_clearing_time_s }} s{% else %}待产品曲线{% endif %}</dd></div>
+      <div><dt>切除时间控制依据</dt><dd>{{ pe_outputs.clearing_time_governing_basis or '无法判断' }}{% if pe_outputs.calculated_thermal_time_limit_s is defined and pe_outputs.calculated_thermal_time_limit_s > 5 %}（按热应力计算为{{ pe_outputs.calculated_thermal_time_limit_s }}s，超过本方法适用范围）{% endif %}</dd></div>
+      <div><dt>最大允许通过能量</dt><dd>{% if pe_outputs.maximum_permitted_let_through_energy_a2s is defined %}I²t ≤ {{ pe_outputs.maximum_permitted_let_through_energy_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
+      {% if pe_outputs.source %}<div><dt>计算依据</dt><dd>{{ pe_outputs.source }} · {{ pe_outputs.section }} · {{ pe_outputs.pages }}</dd></div>{% endif %}
+    </dl>
+    <div class="trace">
+      {% for step in pe.steps %}
+      <article><span class="step-no">{{ "%02d"|format(loop.index) }}</span><div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div><strong>{{ step.value }} {{ step.unit }}</strong></article>
+      {% endfor %}
+    </div>
+    <section class="alert warning"><strong>暂算警告</strong><ul>{% for warning in pe.warnings %}<li>{{ warning }}</li>{% else %}<li>无引擎返回警告。</li>{% endfor %}</ul></section>
+  </section>
+  {% endif %}
+
+  {% if result.outputs.parameter %}
+  <section class="panel candidate-panel">
+    <div class="section-title">
+      <div><p class="eyebrow">PARAMETER</p><h2>本次采用参数</h2></div>
+      {% if result.outputs.parameter.conservative %}<span class="status-pill pending">保守初选</span>{% endif %}
+    </div>
+    <dl class="parameter-grid">
+      <div><dt>负荷类型</dt><dd>{{ result.outputs.parameter.name }}</dd></div>
+      <div><dt>资料功率因数范围</dt><dd>{% if result.outputs.parameter.power_factor_min is not none %}{{ result.outputs.parameter.power_factor_min }}～{{ result.outputs.parameter.power_factor_max }}{% else %}无资料值{% endif %}</dd></div>
+      <div><dt>本次采用</dt><dd>{{ result.outputs.parameter.adopted_power_factor }}</dd></div>
+      <div><dt>采用方式</dt><dd>{{ result.outputs.parameter.adopted_source }}</dd></div>
+      {% if result.outputs.parameter.source %}<div><dt>资料定位</dt><dd>{{ result.outputs.parameter.source }} · {{ result.outputs.parameter.table }} · {{ result.outputs.parameter.page }}</dd></div>{% endif %}
+    </dl>
+  </section>
+  {% endif %}
+
+  <div class="selection-grid">
+    <section class="panel">
+      <p class="eyebrow">BREAKER</p><h2>断路器设计参数要求</h2>
+      {% if result.outputs.breaker_design_candidates %}
+      <div class="candidate-list">
+        {% for item in result.outputs.breaker_design_candidates %}
+        <div>
+          <strong>{{ item.family_name }} · In {{ item.rated_current_a }} A</strong>
+          <span>极数：{{ item.poles }} · 额定电压 {{ item.rated_voltage_v }} V · {{ item.frame_label }} {{ item.frame_rating_a }} A</span>
+          <span>
+            {% if item.selected_icu_ka is not none %}
+            Icu ≥ {{ item.required_icu_ka }} kA，表列候选 {{ item.selected_icu_ka }} kA
+            {% elif item.required_icu_ka is not none %}
+            Icu 要求超出当前表列档位
+            {% else %}
+            Icu待算；表列档位 {{ item.available_icu_ka|join(' / ') }} kA
+            {% endif %}
+          </span>
+          <small>{{ item.source }} · {{ item.table }} · {{ item.page }} · 技术参数参考</small>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty-note">计算电流已超出当前核验表的覆盖范围，或断路器参数表尚不可用。只给出最低额定电流要求。</p>
+      {% endif %}
+      <p class="empty-note">以上是19DX101-1参数档位，不是品牌型号。极数不由电缆芯数推断；脱扣特性、选择性及产品实物参数仍需确认。</p>
+    </section>
+    <section class="panel">
+      <p class="eyebrow">CONDUCTOR</p><h2>导体初选</h2>
+      {% if result.outputs.conductor_basis is mapping %}
+      <p class="basis-note"><strong>系统自动查表：{{ result.outputs.conductor_basis.label }}</strong><br>{{ result.outputs.conductor_basis.note }}<br>{{ result.outputs.conductor_basis.reference_condition }}<br>{{ result.outputs.conductor_basis.source }} · {{ result.outputs.conductor_basis.table }} · {{ result.outputs.conductor_basis.page }}</p>
+      {% endif %}
+      {% if result.outputs.conductor_configuration %}
+      <p class="basis-note"><strong>{{ result.outputs.conductor_configuration.label }}</strong><br>{{ result.outputs.conductor_configuration.description }}<br>该芯数仅用于电缆/导线查表，不决定断路器极数。</p>
+      {% endif %}
+      {% if result.outputs.cable_candidates %}
+      <p class="basis-note"><strong>选择方法</strong><br>按修正后允许载流量 ≥ {{ result.outputs.required_cable_ampacity_a }} A，取载流量表中第一个满足条件的最小截面。</p>
+      <div class="candidate-list">
+        {% for item in result.outputs.cable_candidates %}
+        <div>
+          <strong>推荐最小截面：{{ item.family }} {{ item.section_mm2 }} mm² · {{ item.status }}</strong>
+          <span>基础载流量 {{ item.base_ampacity_a }} A；温度修正后 {{ item.temperature_corrected_ampacity_a }} A；综合修正后 {{ item.corrected_ampacity_a }} A</span>
+          {% set loop_structure = item.get('fault_loop_structure') %}
+          {% if loop_structure %}
+          <small>结构参数暂算：主导体 {{ loop_structure.phase_section_mm2 }} mm²；表列中性线（接地线） {{ loop_structure.protective_section_mm2 }} mm²。{{ loop_structure.source }} · {{ loop_structure.table }} · {{ loop_structure.page }}</small>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty-note">载流量规则、断路器候选或载流条件尚不足，只显示最低基础载流量。芯数：<strong>{{ result.outputs.core_configuration }}</strong>；N/PE 配置：<strong>{{ result.outputs.neutral_pe_configuration }}</strong>。</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {% if result.outputs.temperature_correction %}
+  <section class="panel candidate-panel"><p class="eyebrow">TEMPERATURE</p><h2>载流量温度修正</h2><p class="basis-note">{{ result.outputs.temperature_correction.mode_label }} {{ result.outputs.temperature_correction.actual_temperature_c }}℃；基础表温度 {{ result.outputs.temperature_correction.base_temperature_c }}℃；相对修正系数 {{ result.outputs.temperature_correction.relative_factor }}。<br>{{ result.outputs.temperature_correction.source }} · {{ result.outputs.temperature_correction.table }} · {{ result.outputs.temperature_correction.page }}（已核实、未批准）</p></section>
+  {% endif %}
+
+  {% if result.outputs.tray_configuration %}
+  <section class="panel candidate-panel"><p class="eyebrow">CABLE TRUNKING</p><h2>槽盒载流量修正</h2><p class="basis-note">{{ result.outputs.tray_configuration.layers }}层，每层{{ result.outputs.tray_configuration.cables_per_layer }}根相同线缆；降额系数 {{ result.outputs.tray_configuration.derating_factor }}。<br>{{ result.outputs.tray_configuration.source }} · {{ result.outputs.tray_configuration.table }} · {{ result.outputs.tray_configuration.page }}（原表术语：托盘/梯架）</p></section>
+  {% endif %}
+
+  <section class="panel candidate-panel">
+    <div class="section-title">
+      <div><p class="eyebrow">RCD</p><h2>剩余电流保护参数</h2></div>
+      <span class="status-pill pending">用途决定参数</span>
+    </div>
+    <dl class="parameter-grid">
+      <div><dt>用途 / 场所</dt><dd>{{ result.outputs.rcd_requirement.name }}</dd></div>
+      <div><dt>额定剩余动作电流</dt><dd>{% if result.outputs.rcd_requirement.rated_residual_current_max_ma is not none %}≤ {{ result.outputs.rcd_requirement.rated_residual_current_max_ma }} mA{% else %}无法判断{% endif %}</dd></div>
+      <div><dt>延时要求</dt><dd>{{ result.outputs.rcd_requirement.delay }}</dd></div>
+      <div><dt>RCD类型</dt><dd>{{ result.outputs.rcd_requirement.rcd_type }}</dd></div>
+      <div><dt>剩余电流波形</dt><dd>{{ result.outputs.rcd_requirement.residual_waveform }}</dd></div>
+      {% if result.outputs.rcd_requirement.source %}
+      <div><dt>资料定位</dt><dd>{{ result.outputs.rcd_requirement.source }} · {{ result.outputs.rcd_requirement.table }} · {{ result.outputs.rcd_requirement.page }}</dd></div>
+      {% endif %}
+    </dl>
+    {% if result.outputs.rcd_requirement.selection_checks %}
+    <p class="basis-note"><strong>工程核对提示（非规范原文）</strong></p>
+    <ul class="compact-list">{% for check in result.outputs.rcd_requirement.selection_checks %}<li>{{ check }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+
+  <section class="panel voltage-panel">
+    <p class="eyebrow">VOLTAGE DROP</p><h2>电压降</h2>
+    {% if result.outputs.voltage_drop and result.outputs.voltage_drop.calculated %}
+    <div class="voltage-result">
+      <div><span>电压降</span><strong>{{ result.outputs.voltage_drop.voltage_drop_v }} V</strong></div>
+      <div><span>电压降率</span><strong>{{ result.outputs.voltage_drop.voltage_drop_pct }}%</strong></div>
+      <div><span>自动采用限值</span><strong>{{ result.outputs.voltage_drop.limit_pct }}%</strong></div>
+      <div><span>规范限值校核</span><strong>{{ result.outputs.voltage_drop.provisional_status }}</strong></div>
+      <div><span>正式状态</span><strong class="unknown-text">{{ result.outputs.voltage_drop.status }}</strong></div>
+    </div>
+    <p class="basis-note">
+      <strong>自动采用 {{ result.outputs.voltage_drop.selected_section_mm2 }} mm²</strong>；
+      R={{ result.outputs.voltage_drop.resistance_ohm_per_km }} Ω/km，
+      X={{ result.outputs.voltage_drop.reactance_ohm_per_km }} Ω/km，
+      cosφ={{ result.outputs.voltage_drop.adopted_power_factor }}。<br>
+      {{ result.outputs.voltage_drop.power_factor_source }}<br>
+      {{ result.outputs.voltage_drop.parameter_source.source }} ·
+      {{ result.outputs.voltage_drop.parameter_source.table }} ·
+      {{ result.outputs.voltage_drop.parameter_source.page }}
+      {% if result.outputs.voltage_drop.parameter_source.application_note %}<br>{{ result.outputs.voltage_drop.parameter_source.application_note }}{% endif %}
+      <br>
+      限值：{{ result.outputs.voltage_drop.limit_source.classification }}，表列 {{ result.outputs.voltage_drop.limit_source.table_value }}% → 采用 {{ result.outputs.voltage_drop.limit_pct }}%；
+      {{ result.outputs.voltage_drop.limit_source.source }} · {{ result.outputs.voltage_drop.limit_source.clause }} · {{ result.outputs.voltage_drop.limit_source.table }} · {{ result.outputs.voltage_drop.limit_source.page }}。<br>
+      适用起算边界：{{ result.outputs.voltage_drop.limit_source.boundary }}。{% if result.outputs.voltage_drop.limit_source.selection_note %}<br>{{ result.outputs.voltage_drop.limit_source.selection_note }}{% endif %}
+    </p>
+    {% else %}
+    <p class="empty-note">只需填写线路长度；系统将按本次初选截面自动查取 R/X。若截面或敷设组合尚无可靠表格覆盖，会明确列出原因。</p>
+    {% endif %}
+  </section>
+
+  <section class="panel trace-panel">
+    <div class="section-title"><div><p class="eyebrow">TRACE</p><h2>计算过程</h2></div></div>
+    <div class="trace">
+      {% for step in result.steps %}
+      <article><span class="step-no">{{ "%02d"|format(loop.index) }}</span><div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div><strong>{{ step.value }} {{ step.unit }}</strong></article>
+      {% else %}
+      <div class="empty"><strong>无法计算</strong><p>请检查下方提示指出的输入条件。</p></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if result.outputs.incomplete_checks %}
+  <section class="panel">
+    <p class="eyebrow">NOT CHECKED</p><h2>仍需完成的专业校核</h2>
+    <div class="check-tags">{% for item in result.outputs.incomplete_checks %}<span>{{ item }}</span>{% endfor %}</div>
+    <div class="basis-note check-roadmap">
+      <strong>实施顺序</strong><br>
+      下一阶段：环境温度修正与更多成组敷设条件 → 三相短路与分断能力联动 → 断路器极数与选择性。
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="alert warning quick-warning"><strong>计算提示</strong><ul>{% for warning in result.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></section>
+</section>
+{% else %}
+<section class="wizard-placeholder">
+  <strong>本页最终将形成一条完整计算链</strong>
+  <p>负荷 → 电流 → 断路器 → 电缆 → 电压降 → 短路 → 接地故障。资料具备时自动形成计算结果或设计约束；具体产品实物校核保留在专家区。</p>
+</section>
+{% endif %}
+
+<script>
+const basis = document.querySelector('#input-basis');
+const phase = document.querySelector('#phase');
+const voltage = document.querySelector('#voltage');
+const family = document.querySelector('#family');
+const scenario = document.querySelector('#scenario');
+const conductorConfiguration = document.querySelector('#conductor-configuration');
+const trayConditions = document.querySelector('#tray-conditions');
+const groundConditions = document.querySelector('#ground-conditions');
+const enclosedConditions = document.querySelector('#enclosed-conditions');
+const buriedCircuitCount = document.querySelector('#buried-circuit-count');
+const buriedSpacingField = document.querySelector('#buried-spacing-field');
+const buriedDepthField = document.querySelector('#buried-depth-field');
+const installationTemperature = document.querySelector('#installation-temperature');
+const installationTemperatureLabel = document.querySelector('#installation-temperature-label');
+const temperatureBasisNote = document.querySelector('#temperature-basis-note');
+const loadType = document.querySelector('#load-type');
+const powerDefinition = document.querySelector('#power-definition');
+const shortCircuitMethod = document.querySelector('#short-circuit-method');
+const terminalShortCircuitEnabled = document.querySelector('#terminal-short-circuit-enabled');
+const terminalShortCircuitFields = document.querySelector('#terminal-short-circuit-fields');
+const shortCircuitLineType = document.querySelector('#short-circuit-line-type');
+const terminalBuswayFields = document.querySelector('#terminal-busway-fields');
+const shortCircuitCableSectionField = document.querySelector('#short-circuit-cable-section-field');
+const sourceImpedanceMode = document.querySelector('#source-impedance-mode');
+const terminalSourceImpedanceFields = document.querySelector('.terminal-source-impedance-fields');
+const terminalSourceCapacityFields = document.querySelector('.terminal-source-capacity-fields');
+const earthFaultEnabled = document.querySelector('#earth-fault-enabled');
+const earthFaultFields = document.querySelector('#earth-fault-fields');
+const earthFaultProtectionType = document.querySelector('#earth-fault-protection-type');
+const rcdPenSplitField = document.querySelector('#rcd-pen-split-field');
+const faultConnectionType = document.querySelector('#fault-connection-type');
+const faultBuswayFields = [...document.querySelectorAll('.fault-busway-field')];
+const faultProtectiveCoreRole = document.querySelector('#fault-protective-core-role');
+const faultProtectiveCoreNote = document.querySelector('#fault-protective-core-note');
+const roleInputs = [...document.querySelectorAll('input[name="circuit_role"]')];
+const nominalLineToEarthVoltage = document.querySelector('#nominal-line-to-earth-voltage');
+const nominalLineToEarthVoltageNote = document.querySelector('#nominal-line-to-earth-voltage-note');
+
+function selectedRole() {
+  return roleInputs.find(input => input.checked)?.value || 'single_device';
+}
+function syncBasis() {
+  const value = basis.value;
+  document.querySelector('#value-label').textContent =
+    value === 'kw' ? '总输入有功功率 (kW)' : value === 'kva' ? '视在功率 (kVA)' : '已知电流 (A)';
+  document.querySelector('#load-type-field').hidden = value !== 'kw';
+  document.querySelector('#power-advanced').hidden = value === 'current';
+  syncPowerDefinition();
+}
+function applyDefaultVoltage() {
+  voltage.value = phase.value === '1' ? '220' : '380';
+  syncNominalLineToEarthVoltage();
+}
+function syncNominalLineToEarthVoltage() {
+  if (!nominalLineToEarthVoltage) return;
+  const systemVoltage = Number(voltage.value);
+  if (!Number.isFinite(systemVoltage) || systemVoltage <= 0) {
+    nominalLineToEarthVoltage.value = '—';
+    nominalLineToEarthVoltageNote.textContent = '相制或电压无效，无法形成U₀。';
+    return;
+  }
+  if (phase.value === '1') {
+    nominalLineToEarthVoltage.value = String(systemVoltage);
+    nominalLineToEarthVoltageNote.textContent = '单相回路：U₀采用输入电压。';
+  } else if (Math.abs(systemVoltage - 380) < 0.01) {
+    nominalLineToEarthVoltage.value = '220';
+    nominalLineToEarthVoltageNote.textContent = '三相380V系统：U₀自动采用220V。';
+  } else if (Math.abs(systemVoltage - 400) < 0.01) {
+    nominalLineToEarthVoltage.value = '230';
+    nominalLineToEarthVoltageNote.textContent = '三相400V系统：U₀自动采用230V。';
+  } else {
+    nominalLineToEarthVoltage.value = (systemVoltage / Math.sqrt(3)).toFixed(4);
+    nominalLineToEarthVoltageNote.textContent = '非标准三相线电压：U₀按ULL/√3计算。';
+  }
+}
+function syncLoadPhase() {
+  const phases = (loadType.selectedOptions[0]?.dataset.phases || '').split(',').filter(Boolean);
+  const helper = document.querySelector('#phase-help');
+  if (!phases.length || basis.value !== 'kw') {
+    helper.textContent = '';
+    return;
+  }
+  if (selectedRole() === 'single_device' && !phases.includes(phase.value)) {
+    phase.value = phases[0];
+    applyDefaultVoltage();
+    helper.textContent = `已按该设备适用相制自动调整为${phase.value === '1' ? '单相' : '三相'}；电压仍可手动修改。`;
+  } else if (selectedRole() !== 'single_device' && !phases.includes(phase.value)) {
+    helper.textContent = '本次按同类单相设备在三相回路中均衡汇总，必须确认各相负荷分配。';
+  } else {
+    helper.textContent = '';
+  }
+}
+function syncPowerDefinition() {
+  const singleDevice = selectedRole() === 'single_device';
+  const installedOption = powerDefinition.querySelector('option[value="installed"]');
+  installedOption.hidden = singleDevice;
+  if (singleDevice && powerDefinition.value === 'installed') powerDefinition.value = 'design';
+  const showDemand = basis.value === 'kw' && !singleDevice && powerDefinition.value === 'installed';
+  const demandField = document.querySelector('#demand-field');
+  demandField.hidden = !showDemand;
+  demandField.querySelector('input').disabled = !showDemand;
+}
+function syncScenario() {
+  const selectedFamily = family.value;
+  [...scenario.options].forEach(option => {
+    option.hidden = !option.dataset.family.split(',').includes(selectedFamily);
+  });
+  if (scenario.selectedOptions[0]?.hidden) scenario.value = selectedFamily === 'BV' ? 'conduit' : 'tray';
+}
+function syncConductorConfiguration() {
+  [...conductorConfiguration.options].forEach(option => {
+    option.hidden = option.dataset.family !== family.value || !option.dataset.phases.split(',').includes(phase.value);
+  });
+  if (conductorConfiguration.selectedOptions[0]?.hidden) {
+    conductorConfiguration.value = [...conductorConfiguration.options].find(option => !option.hidden)?.value || '';
+  }
+  syncFaultProtectiveCore();
+}
+function syncFaultProtectiveCore() {
+  if (!faultProtectiveCoreRole || !faultProtectiveCoreNote) return;
+  if (conductorConfiguration.value === 'yjv_5c_3ph_n_pe') {
+    faultProtectiveCoreRole.value = 'PE';
+    faultProtectiveCoreNote.textContent = '五芯电缆设计初选：系统按其中一芯为PE自动组成故障回路；正式结果仍须按图纸或实际芯线用途确认。';
+  } else if (conductorConfiguration.value === 'yjv_4c_3ph_n_pe') {
+    faultProtectiveCoreNote.textContent = '四芯电缆可能是3L+PE或3L+N，必须按图纸确认，系统不会猜测。';
+  } else {
+    faultProtectiveCoreNote.textContent = '当前导体结构尚未建立内置PE故障回路，需在专家复核中提供完整Zs。';
+  }
+}
+function syncTrayConditions() {
+  trayConditions.hidden = !(family.value === 'YJV' && scenario.value === 'tray');
+}
+function syncGroundConditions() {
+  groundConditions.hidden = !(family.value === 'YJV' && scenario.value === 'direct_buried');
+  buriedSpacingField.hidden = !(
+    family.value === 'YJV'
+    && scenario.value === 'direct_buried'
+    && Number(buriedCircuitCount.value) > 1
+  );
+  buriedDepthField.hidden = buriedSpacingField.hidden;
+}
+function syncEnclosedConditions() {
+  enclosedConditions.hidden = !(
+    scenario.value === 'conduit'
+    && ['BV', 'YJV'].includes(family.value)
+  );
+}
+function syncTemperatureConditions() {
+  const ground = scenario.value === 'direct_buried';
+  installationTemperatureLabel.textContent = ground ? '地下温度 (℃)' : '环境空气温度 (℃)';
+  temperatureBasisNote.textContent = ground
+    ? '埋地管槽按表6.24换算；基础温度由当前载流量表自动确定。'
+    : '空气中敷设按表6.22换算；系统根据当前载流量表的30℃或40℃基准自动换算。';
+  const maximum = family.value === 'BV' ? 60 : 80;
+  [...installationTemperature.options].forEach(option => {
+    option.hidden = Boolean(option.value) && Number(option.value) > maximum;
+  });
+  if (installationTemperature.selectedOptions[0]?.hidden) installationTemperature.value = '';
+}
+function syncShortCircuitMethod() {
+  document.querySelectorAll('.transformer-short-circuit-field').forEach(field => {
+    field.hidden = shortCircuitMethod.value !== 'transformer_lv_table';
+  });
+}
+function syncTerminalLineType() {
+  const busway = shortCircuitLineType?.value === 'busway';
+  if (terminalBuswayFields) {
+    terminalBuswayFields.hidden = !busway;
+    terminalBuswayFields.querySelectorAll('input, select').forEach(control => {
+      control.disabled = !busway;
+    });
+  }
+  if (shortCircuitCableSectionField) {
+    shortCircuitCableSectionField.hidden = busway;
+    shortCircuitCableSectionField.querySelectorAll('input, select').forEach(control => {
+      control.disabled = busway;
+    });
+  }
+}
+function syncTerminalShortCircuit() {
+  const enabled = true;
+  if (terminalShortCircuitFields) {
+    terminalShortCircuitFields.disabled = !enabled;
+    terminalShortCircuitFields.classList.toggle('is-inactive', !enabled);
+  }
+  const needsSourceRx = sourceImpedanceMode?.value === 'provided';
+  if (terminalSourceImpedanceFields) {
+    terminalSourceImpedanceFields.hidden = !needsSourceRx;
+    terminalSourceImpedanceFields.querySelectorAll('input, select').forEach(control => {
+      control.disabled = !needsSourceRx;
+    });
+  }
+  const needsSourceCapacity = sourceImpedanceMode?.value === 'short_circuit_capacity';
+  if (terminalSourceCapacityFields) {
+    terminalSourceCapacityFields.hidden = !needsSourceCapacity;
+    terminalSourceCapacityFields.querySelectorAll('input, select').forEach(control => {
+      control.disabled = !needsSourceCapacity;
+    });
+  }
+  syncTerminalLineType();
+}
+function syncEarthFault() {
+  const enabled = Boolean(earthFaultEnabled?.checked);
+  if (earthFaultFields) {
+    earthFaultFields.disabled = !enabled;
+    earthFaultFields.classList.toggle('is-inactive', !enabled);
+  }
+  const showRcdSplit = enabled && earthFaultProtectionType?.value === 'rcd';
+  if (rcdPenSplitField) {
+    rcdPenSplitField.hidden = !showRcdSplit;
+    rcdPenSplitField.querySelectorAll('input, select').forEach(control => {
+      control.disabled = !showRcdSplit;
+    });
+  }
+  const showFaultBusway = enabled && faultConnectionType?.value === 'busway';
+  faultBuswayFields.forEach(field => {
+    field.hidden = !showFaultBusway;
+    field.querySelectorAll('input, select').forEach(control => {
+      control.disabled = !showFaultBusway;
+    });
+  });
+}
+
+basis.addEventListener('change', () => { syncBasis(); syncLoadPhase(); });
+phase.addEventListener('change', () => { applyDefaultVoltage(); syncLoadPhase(); syncConductorConfiguration(); });
+voltage.addEventListener('input', syncNominalLineToEarthVoltage);
+family.addEventListener('change', () => { syncScenario(); syncConductorConfiguration(); syncTrayConditions(); syncGroundConditions(); syncEnclosedConditions(); syncTemperatureConditions(); });
+conductorConfiguration.addEventListener('change', syncFaultProtectiveCore);
+scenario.addEventListener('change', () => { syncTrayConditions(); syncGroundConditions(); syncEnclosedConditions(); syncTemperatureConditions(); });
+buriedCircuitCount.addEventListener('change', syncGroundConditions);
+loadType.addEventListener('change', syncLoadPhase);
+powerDefinition.addEventListener('change', syncPowerDefinition);
+shortCircuitMethod.addEventListener('change', syncShortCircuitMethod);
+terminalShortCircuitEnabled?.addEventListener('change', syncTerminalShortCircuit);
+sourceImpedanceMode?.addEventListener('change', syncTerminalShortCircuit);
+shortCircuitLineType?.addEventListener('change', syncTerminalLineType);
+earthFaultEnabled?.addEventListener('change', syncEarthFault);
+earthFaultProtectionType?.addEventListener('change', syncEarthFault);
+faultConnectionType?.addEventListener('change', syncEarthFault);
+roleInputs.forEach(input => input.addEventListener('change', () => { syncLoadPhase(); syncPowerDefinition(); }));
+syncBasis();
+syncScenario();
+syncConductorConfiguration();
+syncTrayConditions();
+syncGroundConditions();
+syncEnclosedConditions();
+syncTemperatureConditions();
+syncShortCircuitMethod();
+syncTerminalShortCircuit();
+syncEarthFault();
+syncLoadPhase();
+syncNominalLineToEarthVoltage();
+</script>
+{% endblock %}

@@ -17,6 +17,32 @@ data/examples/*
 !data/examples/.gitkeep
 data/references/*
 !data/references/.gitkeep
+!data/references/extracted/
+data/references/extracted/*
+!data/references/extracted/product-coordination.json
+!data/references/extracted/schneider-easypact-cvs-protection.json
+!data/references/extracted/schneider-easypact-cvs-i2t-curves.json
+data/project-samples/
+data/*.dwg
+data/*.bak
+data/*.chm
+data/validation-fixtures/low-voltage-radial-circuit.json
+
+# 真实工程专用的本地适配器和回归记录，不进入公开版本
+src/electrical_calc/project_sample_calculation.py
+src/electrical_calc/templates/complete_circuit.html
+tests/test_project_sample_calculation.py
+tests/test_project_samples.py
+
+# 本地协作上下文和阶段交接，不进入公开仓库
+PROJECT_CONTEXT.md
+docs/当前任务.md
+docs/工作交接-*.md
+docs/真实回路样例-*.md
+docs/*学习记录*.md
+docs/*规则核验记录*.md
+docs/*输入推导矩阵*.md
+docs/网络资料来源登记.md
 
 # 生成结果
 outputs/
@@ -27,3 +53,9 @@ outputs/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+data/electrical_calc.db
+data/templates/*.inspect.ndjson
+output/
+.codex-tmp/
+tmp/

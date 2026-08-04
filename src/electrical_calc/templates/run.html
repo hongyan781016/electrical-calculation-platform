@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ run.circuit_code }} · {{ run.module }}{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="/">项目</a><span>/</span><a href="/projects/{{ run.project_id }}">{{ run.project_code }}</a><span>/</span><strong>记录 #{{ run.id }}</strong></nav>
+<section class="run-head">
+  <div><p class="eyebrow">{{ run.circuit_code }} · R{{ run.circuit_revision }}</p><h1>{{ run.module }}</h1><p>{{ run.circuit_name }} · {{ run.created_at }}</p></div>
+  <div class="actions"><a class="button secondary" href="/runs/{{ run.id }}/report.pdf">导出 PDF 计算书</a></div>
+</section>
+
+{% if run.stale %}<div class="alert danger"><strong>记录已过期</strong><span>回路输入在本次计算后发生过修改。该记录保留用于追溯，不代表当前数据。</span></div>{% endif %}
+{% if run.status != "通过" %}<div class="alert warning"><strong>正式状态：{{ run.status }}</strong><span>暂算状态为“{{ run.provisional_status }}”。只有所有关联依据批准后，平台才给出正式判定。</span></div>{% endif %}
+
+<section class="result-strip">
+  {% for key, value in run.result_json.items() %}
+  <div><span>{{ key }}</span><strong>{{ value }}</strong></div>
+  {% else %}
+  <div><span>结果</span><strong>输入不足</strong></div>
+  {% endfor %}
+</section>
+
+<div class="detail-grid">
+  <section>
+    <div class="section-title"><div><p class="eyebrow">CALCULATION TRACE</p><h2>计算过程</h2></div><span>引擎 {{ run.engine_version }}</span></div>
+    <div class="trace">
+      {% for step in run.process_json %}
+      <article>
+        <span class="step-no">{{ "%02d"|format(loop.index) }}</span>
+        <div><h3>{{ step.label }}</h3><code>{{ step.expression }}</code></div>
+        <strong>{{ step.value }} {{ step.unit }}</strong>
+      </article>
+      {% else %}
+      <div class="empty"><strong>未执行计算</strong><p>缺失输入或超出适用范围，详见警告。</p></div>
+      {% endfor %}
+    </div>
+    <div class="section-title"><div><p class="eyebrow">WARNINGS</p><h2>警告与错误</h2></div></div>
+    <ul class="warning-list">
+      {% for warning in run.warnings_json %}<li>{{ warning }}</li>{% else %}<li class="ok">没有警告。</li>{% endfor %}
+    </ul>
+  </section>
+  <aside>
+    <section class="panel">
+      <p class="eyebrow">INPUT SNAPSHOT</p><h2>输入快照</h2>
+      <dl class="kv">
+      {% for key, value in run.input_snapshot.items() %}
+        {% if key not in ["id","project_id","created_at","updated_at"] %}<div><dt>{{ key }}</dt><dd>{{ value if value is not none and value != "" else "—" }}</dd></div>{% endif %}
+      {% endfor %}
+      </dl>
+    </section>
+    <section class="panel">
+      <p class="eyebrow">RULE SNAPSHOT</p><h2>依据快照</h2>
+      {% for code, rule in run.rule_snapshot.items() %}
+      <div class="rule-mini">
+        <div><strong>{{ code }}</strong><span class="tag">{{ rule.status }}</span></div>
+        <p>{{ rule.document_name or "未提供文件" }} · {{ rule.clause_no or "未提供条文号" }} · {{ rule.page_no or "未提供页码" }}</p>
+      </div>
+      {% endfor %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

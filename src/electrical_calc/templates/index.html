@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}项目 · 电气计算台{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">QUICK SELECTION</p>
+    <h1>知道计算电流，<br>直接初选电缆和断路器。</h1>
+    <p>单次计算不需要新建项目，也不需要 Excel。输入计算电流和相制，即可得到待核实的候选结果及缺失的校核条件。</p>
+    <div class="hero-actions">
+      <a class="button hero-button" href="/quick">开始快速初选</a>
+      <a class="button secondary" href="#projects">进入项目库</a>
+    </div>
+  </div>
+  <aside class="readiness">
+    <span>当前发布状态</span>
+    <strong>原型验证</strong>
+    <p>规范原文和厂家参数尚未录入。平台不会把暂算结果标记为正式结论。</p>
+    <a class="text-link" href="/rules">完善计算依据 →</a>
+  </aside>
+</section>
+
+<section class="split" id="projects">
+  <div>
+    <div class="section-title"><div><p class="eyebrow">PROJECTS</p><h2>项目库</h2></div><span>{{ projects|length }} 个项目</span></div>
+    <div class="project-grid">
+      {% for project in projects %}
+      <a class="project-card" href="/projects/{{ project.id }}">
+        <span class="project-code">{{ project.code }}</span>
+        <h3>{{ project.name }}</h3>
+        <p>{{ project.description or "暂无项目说明" }}</p>
+        <div><span>{{ project.circuit_count }} 个回路</span><span>打开项目 →</span></div>
+      </a>
+      {% else %}
+      <div class="empty">
+        <strong>还没有项目</strong>
+        <p>只有需要保存多条回路、历史记录或批量导入时，才需要建立项目。</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <aside class="panel sticky">
+    <p class="eyebrow">NEW PROJECT</p>
+    <h2>建立项目档案</h2>
+    <p class="muted">用于集中保存多条回路、计算历史和导出成果；单次初选请使用上方“快速初选”。</p>
+    <form method="post" action="/projects" class="stack">
+      <label>项目编号<input name="code" required placeholder="例如：2026-001"></label>
+      <label>项目名称<input name="name" required placeholder="例如：研发中心"></label>
+      <label>项目说明<textarea name="description" rows="3" placeholder="可选"></textarea></label>
+      <button type="submit">建立项目</button>
+    </form>
+  </aside>
+</section>
+{% endblock %}

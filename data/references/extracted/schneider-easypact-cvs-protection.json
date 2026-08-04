@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "catalog_code": "SCHNEIDER.EASYPACT.CVS.2024",
+  "manufacturer": "Schneider Electric",
+  "series": "EasyPact CVS",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "document": "data/references/raw/product-reference/official-web/Schneider_EasyPact_CVS_Catalog_2024_LVED210011EN.pdf",
+    "characteristics_reference": "PDF第14页，A-4",
+    "tm_d_reference": "PDF第16页，A-6",
+    "ets_reference": "PDF第19页，A-9",
+    "energy_limiting_reference": "PDF第90～91页，D-10～D-11"
+  },
+  "voltage_range_v": [380, 415],
+  "frames": [
+    {
+      "frame_code": "CVS100",
+      "frame_rating_a": 100,
+      "rated_currents_a": [16, 25, 32, 40, 50, 63, 80, 100],
+      "breaking_levels_ka": {"B": 25, "F": 36, "N": 50},
+      "tm_d_fixed_instantaneous_pickup_a": {
+        "16": 190, "25": 300, "32": 400, "40": 500,
+        "50": 500, "63": 500, "80": 640, "100": 800
+      }
+    },
+    {
+      "frame_code": "CVS160",
+      "frame_rating_a": 160,
+      "rated_currents_a": [100, 125, 160],
+      "breaking_levels_ka": {"B": 25, "F": 36, "N": 50},
+      "tm_d_fixed_instantaneous_pickup_a": {
+        "100": 800, "125": 1250, "160": 1250
+      }
+    },
+    {
+      "frame_code": "CVS250",
+      "frame_rating_a": 250,
+      "rated_currents_a": [160, 200, 250],
+      "breaking_levels_ka": {"B": 25, "F": 36, "N": 50},
+      "tm_d_fixed_instantaneous_pickup_a": {
+        "160": 1250, "200": 2000, "250": 2500
+      }
+    },
+    {
+      "frame_code": "CVS400",
+      "frame_rating_a": 400,
+      "rated_currents_a": [320, 400],
+      "breaking_levels_ka": {"F": 36, "N": 50, "H": 70},
+      "tm_d_adjustable_instantaneous_pickup_a": {
+        "320": [1600, 3200], "400": [2000, 4000]
+      }
+    },
+    {
+      "frame_code": "CVS630",
+      "frame_rating_a": 630,
+      "rated_currents_a": [500, 600, 630],
+      "breaking_levels_ka": {"F": 36, "N": 50, "H": 70},
+      "tm_d_adjustable_instantaneous_pickup_a": {
+        "500": [2500, 5000], "600": [2500, 5000],
+        "630": [3150, 6300]
+      }
+    }
+  ],
+  "ets": {
+    "rated_currents_a": [40, 100, 160, 250, 400, 630],
+    "instantaneous_pickup_a": {
+      "40": 600, "100": 1500, "160": 2400,
+      "250": 3000, "400": 4800, "630": 6930
+    },
+    "short_time_pickup_multipliers": [1.5, 2, 3, 4, 5, 6, 7, 8, 10],
+    "instantaneous_non_tripping_time_ms": 10,
+    "instantaneous_maximum_break_time_ms": 50,
+    "maximum_break_time_condition": "I > Ii"
+  },
+  "energy_limiting_curve": {
+    "available": true,
+    "quantity": "I2t",
+    "unit": "A2s",
+    "status": "verified_vector_digitization",
+    "automatic_evaluation_allowed": true,
+    "formal_calculation_allowed": false,
+    "data_file": "data/references/extracted/schneider-easypact-cvs-i2t-curves.json",
+    "reason": "D-11矢量图线已按对数坐标转换，并以半线宽加坐标容差形成I²t保守上包络；可用于实物暂算复核，但资料尚未批准。"
+  }
+}

@@ -1,0 +1,3345 @@
+{
+  "schema_version": 1,
+  "source": {
+    "document": "Schneider_EasyPact_CVS_Catalog_2024_LVED210011EN.pdf",
+    "pdf_page": 91,
+    "printed_page": "D-11"
+  },
+  "quantity": "I2t",
+  "unit": "A2s",
+  "method": "direct PDF vector-path extraction; log-axis calibration",
+  "mapping_basis": "printed labels and leader alignment on D-11; CVS100 and CVS160 share the lower curve",
+  "plot_calibration": {
+    "pdf_coordinates": {
+      "x0": 93.068,
+      "x1": 301.846,
+      "top": 426.6218,
+      "bottom": 690.2398
+    },
+    "x_axis_ka": [
+      2.0,
+      300.0
+    ],
+    "y_axis_a2s": [
+      1000000000.0,
+      20000.0
+    ]
+  },
+  "uncertainty": {
+    "curve_linewidth_pt": 1.438,
+    "coordinate_allowance_pt": 0.25,
+    "conservative_y_shift_pt": 0.969,
+    "rule": "shift toward larger I2t by half line width plus coordinate allowance"
+  },
+  "labels_for_mapping_review": [
+    {
+      "text": "Curves",
+      "x0": 135.6517,
+      "top": 402.6377
+    },
+    {
+      "text": "CVS630",
+      "x0": 245.6602,
+      "top": 561.2517
+    },
+    {
+      "text": "CVS400",
+      "x0": 245.9005,
+      "top": 569.7461
+    },
+    {
+      "text": "CVS250",
+      "x0": 246.0567,
+      "top": 599.1043
+    },
+    {
+      "text": "CVS100",
+      "x0": 246.0567,
+      "top": 607.5087
+    },
+    {
+      "text": "CVS160",
+      "x0": 246.0567,
+      "top": 615.2101
+    }
+  ],
+  "curves": [
+    {
+      "curve_index": 1,
+      "applicable_frames": [
+        "CVS100",
+        "CVS160"
+      ],
+      "vector_bbox": {
+        "x0": 121.2644,
+        "x1": 227.2414,
+        "top": 607.3111,
+        "bottom": 638.3151
+      },
+      "sample_count": 241,
+      "points": [
+        {
+          "prospective_current_ka": 3.934783,
+          "conservative_i2t_a2s": 175329.912
+        },
+        {
+          "prospective_current_ka": 3.935202,
+          "conservative_i2t_a2s": 175348.441
+        },
+        {
+          "prospective_current_ka": 3.936457,
+          "conservative_i2t_a2s": 175403.956
+        },
+        {
+          "prospective_current_ka": 3.93855,
+          "conservative_i2t_a2s": 175496.365
+        },
+        {
+          "prospective_current_ka": 3.941481,
+          "conservative_i2t_a2s": 175625.599
+        },
+        {
+          "prospective_current_ka": 3.945253,
+          "conservative_i2t_a2s": 175791.613
+        },
+        {
+          "prospective_current_ka": 3.949867,
+          "conservative_i2t_a2s": 175994.384
+        },
+        {
+          "prospective_current_ka": 3.955327,
+          "conservative_i2t_a2s": 176233.913
+        },
+        {
+          "prospective_current_ka": 3.961635,
+          "conservative_i2t_a2s": 176510.22
+        },
+        {
+          "prospective_current_ka": 3.968796,
+          "conservative_i2t_a2s": 176823.35
+        },
+        {
+          "prospective_current_ka": 3.976814,
+          "conservative_i2t_a2s": 177173.37
+        },
+        {
+          "prospective_current_ka": 3.985694,
+          "conservative_i2t_a2s": 177560.368
+        },
+        {
+          "prospective_current_ka": 3.995441,
+          "conservative_i2t_a2s": 177984.456
+        },
+        {
+          "prospective_current_ka": 4.006062,
+          "conservative_i2t_a2s": 178445.766
+        },
+        {
+          "prospective_current_ka": 4.017563,
+          "conservative_i2t_a2s": 178944.452
+        },
+        {
+          "prospective_current_ka": 4.029952,
+          "conservative_i2t_a2s": 179480.692
+        },
+        {
+          "prospective_current_ka": 4.043236,
+          "conservative_i2t_a2s": 180054.685
+        },
+        {
+          "prospective_current_ka": 4.057423,
+          "conservative_i2t_a2s": 180666.652
+        },
+        {
+          "prospective_current_ka": 4.072524,
+          "conservative_i2t_a2s": 181316.836
+        },
+        {
+          "prospective_current_ka": 4.088547,
+          "conservative_i2t_a2s": 182005.504
+        },
+        {
+          "prospective_current_ka": 4.105502,
+          "conservative_i2t_a2s": 182732.944
+        },
+        {
+          "prospective_current_ka": 4.123401,
+          "conservative_i2t_a2s": 183499.467
+        },
+        {
+          "prospective_current_ka": 4.142255,
+          "conservative_i2t_a2s": 184305.407
+        },
+        {
+          "prospective_current_ka": 4.162076,
+          "conservative_i2t_a2s": 185151.121
+        },
+        {
+          "prospective_current_ka": 4.182877,
+          "conservative_i2t_a2s": 186036.989
+        },
+        {
+          "prospective_current_ka": 4.204672,
+          "conservative_i2t_a2s": 186963.414
+        },
+        {
+          "prospective_current_ka": 4.227475,
+          "conservative_i2t_a2s": 187930.824
+        },
+        {
+          "prospective_current_ka": 4.251301,
+          "conservative_i2t_a2s": 188939.67
+        },
+        {
+          "prospective_current_ka": 4.276165,
+          "conservative_i2t_a2s": 189990.428
+        },
+        {
+          "prospective_current_ka": 4.302084,
+          "conservative_i2t_a2s": 191083.597
+        },
+        {
+          "prospective_current_ka": 4.329076,
+          "conservative_i2t_a2s": 192219.704
+        },
+        {
+          "prospective_current_ka": 4.357158,
+          "conservative_i2t_a2s": 193399.297
+        },
+        {
+          "prospective_current_ka": 4.386348,
+          "conservative_i2t_a2s": 194622.953
+        },
+        {
+          "prospective_current_ka": 4.416668,
+          "conservative_i2t_a2s": 195891.275
+        },
+        {
+          "prospective_current_ka": 4.448136,
+          "conservative_i2t_a2s": 197204.89
+        },
+        {
+          "prospective_current_ka": 4.480775,
+          "conservative_i2t_a2s": 198564.454
+        },
+        {
+          "prospective_current_ka": 4.514606,
+          "conservative_i2t_a2s": 199970.651
+        },
+        {
+          "prospective_current_ka": 4.549653,
+          "conservative_i2t_a2s": 201424.19
+        },
+        {
+          "prospective_current_ka": 4.585941,
+          "conservative_i2t_a2s": 202925.812
+        },
+        {
+          "prospective_current_ka": 4.623493,
+          "conservative_i2t_a2s": 204476.285
+        },
+        {
+          "prospective_current_ka": 4.662336,
+          "conservative_i2t_a2s": 206076.407
+        },
+        {
+          "prospective_current_ka": 4.702497,
+          "conservative_i2t_a2s": 207727.005
+        },
+        {
+          "prospective_current_ka": 4.744005,
+          "conservative_i2t_a2s": 209428.939
+        },
+        {
+          "prospective_current_ka": 4.786888,
+          "conservative_i2t_a2s": 211183.099
+        },
+        {
+          "prospective_current_ka": 4.831177,
+          "conservative_i2t_a2s": 212990.407
+        },
+        {
+          "prospective_current_ka": 4.876904,
+          "conservative_i2t_a2s": 214851.82
+        },
+        {
+          "prospective_current_ka": 4.924101,
+          "conservative_i2t_a2s": 216768.325
+        },
+        {
+          "prospective_current_ka": 4.972802,
+          "conservative_i2t_a2s": 218740.947
+        },
+        {
+          "prospective_current_ka": 5.023043,
+          "conservative_i2t_a2s": 220770.744
+        },
+        {
+          "prospective_current_ka": 5.07486,
+          "conservative_i2t_a2s": 222858.809
+        },
+        {
+          "prospective_current_ka": 5.128292,
+          "conservative_i2t_a2s": 225006.276
+        },
+        {
+          "prospective_current_ka": 5.183377,
+          "conservative_i2t_a2s": 227214.312
+        },
+        {
+          "prospective_current_ka": 5.240156,
+          "conservative_i2t_a2s": 229484.126
+        },
+        {
+          "prospective_current_ka": 5.298672,
+          "conservative_i2t_a2s": 231816.964
+        },
+        {
+          "prospective_current_ka": 5.358969,
+          "conservative_i2t_a2s": 234214.116
+        },
+        {
+          "prospective_current_ka": 5.421093,
+          "conservative_i2t_a2s": 236676.911
+        },
+        {
+          "prospective_current_ka": 5.485089,
+          "conservative_i2t_a2s": 239206.72
+        },
+        {
+          "prospective_current_ka": 5.551009,
+          "conservative_i2t_a2s": 241804.962
+        },
+        {
+          "prospective_current_ka": 5.618901,
+          "conservative_i2t_a2s": 244473.097
+        },
+        {
+          "prospective_current_ka": 5.68882,
+          "conservative_i2t_a2s": 247212.632
+        },
+        {
+          "prospective_current_ka": 5.760818,
+          "conservative_i2t_a2s": 250025.124
+        },
+        {
+          "prospective_current_ka": 5.834954,
+          "conservative_i2t_a2s": 252912.175
+        },
+        {
+          "prospective_current_ka": 5.911285,
+          "conservative_i2t_a2s": 255875.439
+        },
+        {
+          "prospective_current_ka": 5.989872,
+          "conservative_i2t_a2s": 258916.622
+        },
+        {
+          "prospective_current_ka": 6.070779,
+          "conservative_i2t_a2s": 262037.482
+        },
+        {
+          "prospective_current_ka": 6.15407,
+          "conservative_i2t_a2s": 265239.831
+        },
+        {
+          "prospective_current_ka": 6.239813,
+          "conservative_i2t_a2s": 268525.537
+        },
+        {
+          "prospective_current_ka": 6.328079,
+          "conservative_i2t_a2s": 271896.526
+        },
+        {
+          "prospective_current_ka": 6.41894,
+          "conservative_i2t_a2s": 275354.783
+        },
+        {
+          "prospective_current_ka": 6.512471,
+          "conservative_i2t_a2s": 278902.352
+        },
+        {
+          "prospective_current_ka": 6.60875,
+          "conservative_i2t_a2s": 282541.34
+        },
+        {
+          "prospective_current_ka": 6.707859,
+          "conservative_i2t_a2s": 286273.921
+        },
+        {
+          "prospective_current_ka": 6.809882,
+          "conservative_i2t_a2s": 290102.331
+        },
+        {
+          "prospective_current_ka": 6.914905,
+          "conservative_i2t_a2s": 294028.876
+        },
+        {
+          "prospective_current_ka": 7.023019,
+          "conservative_i2t_a2s": 298055.931
+        },
+        {
+          "prospective_current_ka": 7.134318,
+          "conservative_i2t_a2s": 302185.945
+        },
+        {
+          "prospective_current_ka": 7.248899,
+          "conservative_i2t_a2s": 306421.438
+        },
+        {
+          "prospective_current_ka": 7.366863,
+          "conservative_i2t_a2s": 310765.008
+        },
+        {
+          "prospective_current_ka": 7.488314,
+          "conservative_i2t_a2s": 315219.331
+        },
+        {
+          "prospective_current_ka": 7.61336,
+          "conservative_i2t_a2s": 319787.165
+        },
+        {
+          "prospective_current_ka": 7.742115,
+          "conservative_i2t_a2s": 324471.349
+        },
+        {
+          "prospective_current_ka": 7.873413,
+          "conservative_i2t_a2s": 329212.126
+        },
+        {
+          "prospective_current_ka": 8.006028,
+          "conservative_i2t_a2s": 333945.691
+        },
+        {
+          "prospective_current_ka": 8.139961,
+          "conservative_i2t_a2s": 338670.382
+        },
+        {
+          "prospective_current_ka": 8.275211,
+          "conservative_i2t_a2s": 343384.544
+        },
+        {
+          "prospective_current_ka": 8.411778,
+          "conservative_i2t_a2s": 348086.534
+        },
+        {
+          "prospective_current_ka": 8.549664,
+          "conservative_i2t_a2s": 352774.72
+        },
+        {
+          "prospective_current_ka": 8.688868,
+          "conservative_i2t_a2s": 357447.483
+        },
+        {
+          "prospective_current_ka": 8.829391,
+          "conservative_i2t_a2s": 362103.219
+        },
+        {
+          "prospective_current_ka": 8.971233,
+          "conservative_i2t_a2s": 366740.34
+        },
+        {
+          "prospective_current_ka": 9.114395,
+          "conservative_i2t_a2s": 371357.275
+        },
+        {
+          "prospective_current_ka": 9.258877,
+          "conservative_i2t_a2s": 375952.472
+        },
+        {
+          "prospective_current_ka": 9.40468,
+          "conservative_i2t_a2s": 380524.4
+        },
+        {
+          "prospective_current_ka": 9.551803,
+          "conservative_i2t_a2s": 385071.55
+        },
+        {
+          "prospective_current_ka": 9.700248,
+          "conservative_i2t_a2s": 389592.432
+        },
+        {
+          "prospective_current_ka": 9.850016,
+          "conservative_i2t_a2s": 394085.585
+        },
+        {
+          "prospective_current_ka": 10.001107,
+          "conservative_i2t_a2s": 398549.571
+        },
+        {
+          "prospective_current_ka": 10.153522,
+          "conservative_i2t_a2s": 402982.976
+        },
+        {
+          "prospective_current_ka": 10.307262,
+          "conservative_i2t_a2s": 407384.418
+        },
+        {
+          "prospective_current_ka": 10.462328,
+          "conservative_i2t_a2s": 411752.54
+        },
+        {
+          "prospective_current_ka": 10.618722,
+          "conservative_i2t_a2s": 416086.017
+        },
+        {
+          "prospective_current_ka": 10.776445,
+          "conservative_i2t_a2s": 420383.551
+        },
+        {
+          "prospective_current_ka": 10.935497,
+          "conservative_i2t_a2s": 424643.88
+        },
+        {
+          "prospective_current_ka": 11.095882,
+          "conservative_i2t_a2s": 428865.772
+        },
+        {
+          "prospective_current_ka": 11.257601,
+          "conservative_i2t_a2s": 433048.027
+        },
+        {
+          "prospective_current_ka": 11.420655,
+          "conservative_i2t_a2s": 437189.482
+        },
+        {
+          "prospective_current_ka": 11.585048,
+          "conservative_i2t_a2s": 441289.007
+        },
+        {
+          "prospective_current_ka": 11.750781,
+          "conservative_i2t_a2s": 445345.507
+        },
+        {
+          "prospective_current_ka": 11.917856,
+          "conservative_i2t_a2s": 449357.925
+        },
+        {
+          "prospective_current_ka": 12.086278,
+          "conservative_i2t_a2s": 453325.24
+        },
+        {
+          "prospective_current_ka": 12.256048,
+          "conservative_i2t_a2s": 457246.468
+        },
+        {
+          "prospective_current_ka": 12.427171,
+          "conservative_i2t_a2s": 461120.663
+        },
+        {
+          "prospective_current_ka": 12.599649,
+          "conservative_i2t_a2s": 464946.918
+        },
+        {
+          "prospective_current_ka": 12.773486,
+          "conservative_i2t_a2s": 468724.364
+        },
+        {
+          "prospective_current_ka": 12.948687,
+          "conservative_i2t_a2s": 472452.173
+        },
+        {
+          "prospective_current_ka": 13.125256,
+          "conservative_i2t_a2s": 476129.554
+        },
+        {
+          "prospective_current_ka": 13.303197,
+          "conservative_i2t_a2s": 479755.758
+        },
+        {
+          "prospective_current_ka": 13.482515,
+          "conservative_i2t_a2s": 483330.075
+        },
+        {
+          "prospective_current_ka": 13.663216,
+          "conservative_i2t_a2s": 486851.835
+        },
+        {
+          "prospective_current_ka": 13.845305,
+          "conservative_i2t_a2s": 490320.411
+        },
+        {
+          "prospective_current_ka": 14.028788,
+          "conservative_i2t_a2s": 493735.213
+        },
+        {
+          "prospective_current_ka": 14.213672,
+          "conservative_i2t_a2s": 497095.694
+        },
+        {
+          "prospective_current_ka": 14.399962,
+          "conservative_i2t_a2s": 500401.348
+        },
+        {
+          "prospective_current_ka": 14.587666,
+          "conservative_i2t_a2s": 503651.707
+        },
+        {
+          "prospective_current_ka": 14.776792,
+          "conservative_i2t_a2s": 506846.348
+        },
+        {
+          "prospective_current_ka": 14.967347,
+          "conservative_i2t_a2s": 509984.883
+        },
+        {
+          "prospective_current_ka": 15.159339,
+          "conservative_i2t_a2s": 513066.97
+        },
+        {
+          "prospective_current_ka": 15.352778,
+          "conservative_i2t_a2s": 516092.304
+        },
+        {
+          "prospective_current_ka": 15.547671,
+          "conservative_i2t_a2s": 519060.621
+        },
+        {
+          "prospective_current_ka": 15.744029,
+          "conservative_i2t_a2s": 521971.696
+        },
+        {
+          "prospective_current_ka": 15.941861,
+          "conservative_i2t_a2s": 524825.344
+        },
+        {
+          "prospective_current_ka": 16.141178,
+          "conservative_i2t_a2s": 527621.421
+        },
+        {
+          "prospective_current_ka": 16.341991,
+          "conservative_i2t_a2s": 530359.818
+        },
+        {
+          "prospective_current_ka": 16.544311,
+          "conservative_i2t_a2s": 533040.468
+        },
+        {
+          "prospective_current_ka": 16.74815,
+          "conservative_i2t_a2s": 535663.342
+        },
+        {
+          "prospective_current_ka": 16.953521,
+          "conservative_i2t_a2s": 538228.445
+        },
+        {
+          "prospective_current_ka": 17.160436,
+          "conservative_i2t_a2s": 540735.825
+        },
+        {
+          "prospective_current_ka": 17.368909,
+          "conservative_i2t_a2s": 543185.56
+        },
+        {
+          "prospective_current_ka": 17.578955,
+          "conservative_i2t_a2s": 545577.771
+        },
+        {
+          "prospective_current_ka": 17.790587,
+          "conservative_i2t_a2s": 547912.609
+        },
+        {
+          "prospective_current_ka": 18.003822,
+          "conservative_i2t_a2s": 550190.264
+        },
+        {
+          "prospective_current_ka": 18.218674,
+          "conservative_i2t_a2s": 552410.96
+        },
+        {
+          "prospective_current_ka": 18.435161,
+          "conservative_i2t_a2s": 554574.952
+        },
+        {
+          "prospective_current_ka": 18.6533,
+          "conservative_i2t_a2s": 556682.531
+        },
+        {
+          "prospective_current_ka": 18.873108,
+          "conservative_i2t_a2s": 558734.021
+        },
+        {
+          "prospective_current_ka": 19.094603,
+          "conservative_i2t_a2s": 560729.778
+        },
+        {
+          "prospective_current_ka": 19.317806,
+          "conservative_i2t_a2s": 562670.186
+        },
+        {
+          "prospective_current_ka": 19.542735,
+          "conservative_i2t_a2s": 564555.665
+        },
+        {
+          "prospective_current_ka": 19.769412,
+          "conservative_i2t_a2s": 566386.662
+        },
+        {
+          "prospective_current_ka": 19.997856,
+          "conservative_i2t_a2s": 568163.652
+        },
+        {
+          "prospective_current_ka": 20.228092,
+          "conservative_i2t_a2s": 569887.142
+        },
+        {
+          "prospective_current_ka": 20.46014,
+          "conservative_i2t_a2s": 571557.665
+        },
+        {
+          "prospective_current_ka": 20.694025,
+          "conservative_i2t_a2s": 573175.782
+        },
+        {
+          "prospective_current_ka": 20.929771,
+          "conservative_i2t_a2s": 574742.079
+        },
+        {
+          "prospective_current_ka": 21.167403,
+          "conservative_i2t_a2s": 576257.17
+        },
+        {
+          "prospective_current_ka": 21.406947,
+          "conservative_i2t_a2s": 577721.691
+        },
+        {
+          "prospective_current_ka": 21.64843,
+          "conservative_i2t_a2s": 579136.305
+        },
+        {
+          "prospective_current_ka": 21.891878,
+          "conservative_i2t_a2s": 580501.697
+        },
+        {
+          "prospective_current_ka": 22.137322,
+          "conservative_i2t_a2s": 581818.576
+        },
+        {
+          "prospective_current_ka": 22.38479,
+          "conservative_i2t_a2s": 583087.671
+        },
+        {
+          "prospective_current_ka": 22.634312,
+          "conservative_i2t_a2s": 584309.734
+        },
+        {
+          "prospective_current_ka": 22.755342,
+          "conservative_i2t_a2s": 584877.953
+        },
+        {
+          "prospective_current_ka": 22.8812,
+          "conservative_i2t_a2s": 585445.838
+        },
+        {
+          "prospective_current_ka": 23.011902,
+          "conservative_i2t_a2s": 586013.357
+        },
+        {
+          "prospective_current_ka": 23.147462,
+          "conservative_i2t_a2s": 586580.478
+        },
+        {
+          "prospective_current_ka": 23.287899,
+          "conservative_i2t_a2s": 587147.169
+        },
+        {
+          "prospective_current_ka": 23.433231,
+          "conservative_i2t_a2s": 587713.397
+        },
+        {
+          "prospective_current_ka": 23.583478,
+          "conservative_i2t_a2s": 588279.128
+        },
+        {
+          "prospective_current_ka": 23.738663,
+          "conservative_i2t_a2s": 588844.332
+        },
+        {
+          "prospective_current_ka": 23.898808,
+          "conservative_i2t_a2s": 589408.973
+        },
+        {
+          "prospective_current_ka": 24.063939,
+          "conservative_i2t_a2s": 589973.021
+        },
+        {
+          "prospective_current_ka": 24.234082,
+          "conservative_i2t_a2s": 590536.44
+        },
+        {
+          "prospective_current_ka": 24.409264,
+          "conservative_i2t_a2s": 591099.199
+        },
+        {
+          "prospective_current_ka": 24.589515,
+          "conservative_i2t_a2s": 591661.264
+        },
+        {
+          "prospective_current_ka": 24.774863,
+          "conservative_i2t_a2s": 592222.601
+        },
+        {
+          "prospective_current_ka": 24.96534,
+          "conservative_i2t_a2s": 592783.176
+        },
+        {
+          "prospective_current_ka": 25.160979,
+          "conservative_i2t_a2s": 593342.957
+        },
+        {
+          "prospective_current_ka": 25.361811,
+          "conservative_i2t_a2s": 593901.909
+        },
+        {
+          "prospective_current_ka": 25.567873,
+          "conservative_i2t_a2s": 594459.998
+        },
+        {
+          "prospective_current_ka": 25.779198,
+          "conservative_i2t_a2s": 595017.19
+        },
+        {
+          "prospective_current_ka": 25.995823,
+          "conservative_i2t_a2s": 595573.452
+        },
+        {
+          "prospective_current_ka": 26.217784,
+          "conservative_i2t_a2s": 596128.748
+        },
+        {
+          "prospective_current_ka": 26.44512,
+          "conservative_i2t_a2s": 596683.044
+        },
+        {
+          "prospective_current_ka": 26.677868,
+          "conservative_i2t_a2s": 597236.307
+        },
+        {
+          "prospective_current_ka": 26.916068,
+          "conservative_i2t_a2s": 597788.501
+        },
+        {
+          "prospective_current_ka": 27.159759,
+          "conservative_i2t_a2s": 598339.591
+        },
+        {
+          "prospective_current_ka": 27.408982,
+          "conservative_i2t_a2s": 598889.543
+        },
+        {
+          "prospective_current_ka": 27.663776,
+          "conservative_i2t_a2s": 599438.323
+        },
+        {
+          "prospective_current_ka": 27.924184,
+          "conservative_i2t_a2s": 599985.894
+        },
+        {
+          "prospective_current_ka": 28.190246,
+          "conservative_i2t_a2s": 600532.222
+        },
+        {
+          "prospective_current_ka": 28.462005,
+          "conservative_i2t_a2s": 601077.271
+        },
+        {
+          "prospective_current_ka": 28.739502,
+          "conservative_i2t_a2s": 601621.006
+        },
+        {
+          "prospective_current_ka": 29.022779,
+          "conservative_i2t_a2s": 602163.393
+        },
+        {
+          "prospective_current_ka": 29.311878,
+          "conservative_i2t_a2s": 602704.394
+        },
+        {
+          "prospective_current_ka": 29.606843,
+          "conservative_i2t_a2s": 603243.975
+        },
+        {
+          "prospective_current_ka": 29.907715,
+          "conservative_i2t_a2s": 603782.099
+        },
+        {
+          "prospective_current_ka": 30.214536,
+          "conservative_i2t_a2s": 604318.732
+        },
+        {
+          "prospective_current_ka": 30.527348,
+          "conservative_i2t_a2s": 604853.836
+        },
+        {
+          "prospective_current_ka": 30.846192,
+          "conservative_i2t_a2s": 605387.376
+        },
+        {
+          "prospective_current_ka": 31.17111,
+          "conservative_i2t_a2s": 605919.316
+        },
+        {
+          "prospective_current_ka": 31.502143,
+          "conservative_i2t_a2s": 606449.619
+        },
+        {
+          "prospective_current_ka": 31.839331,
+          "conservative_i2t_a2s": 606978.25
+        },
+        {
+          "prospective_current_ka": 32.182714,
+          "conservative_i2t_a2s": 607505.171
+        },
+        {
+          "prospective_current_ka": 32.53233,
+          "conservative_i2t_a2s": 608030.346
+        },
+        {
+          "prospective_current_ka": 32.888217,
+          "conservative_i2t_a2s": 608553.739
+        },
+        {
+          "prospective_current_ka": 33.250414,
+          "conservative_i2t_a2s": 609075.312
+        },
+        {
+          "prospective_current_ka": 33.618956,
+          "conservative_i2t_a2s": 609595.03
+        },
+        {
+          "prospective_current_ka": 33.993878,
+          "conservative_i2t_a2s": 610112.854
+        },
+        {
+          "prospective_current_ka": 34.375215,
+          "conservative_i2t_a2s": 610628.749
+        },
+        {
+          "prospective_current_ka": 34.762999,
+          "conservative_i2t_a2s": 611142.676
+        },
+        {
+          "prospective_current_ka": 35.157262,
+          "conservative_i2t_a2s": 611654.599
+        },
+        {
+          "prospective_current_ka": 35.558033,
+          "conservative_i2t_a2s": 612164.48
+        },
+        {
+          "prospective_current_ka": 35.965341,
+          "conservative_i2t_a2s": 612672.283
+        },
+        {
+          "prospective_current_ka": 36.379213,
+          "conservative_i2t_a2s": 613177.969
+        },
+        {
+          "prospective_current_ka": 36.799672,
+          "conservative_i2t_a2s": 613681.502
+        },
+        {
+          "prospective_current_ka": 37.226742,
+          "conservative_i2t_a2s": 614182.843
+        },
+        {
+          "prospective_current_ka": 37.660443,
+          "conservative_i2t_a2s": 614681.955
+        },
+        {
+          "prospective_current_ka": 38.100794,
+          "conservative_i2t_a2s": 615178.8
+        },
+        {
+          "prospective_current_ka": 38.547812,
+          "conservative_i2t_a2s": 615673.341
+        },
+        {
+          "prospective_current_ka": 39.001509,
+          "conservative_i2t_a2s": 616165.539
+        },
+        {
+          "prospective_current_ka": 39.461896,
+          "conservative_i2t_a2s": 616655.356
+        },
+        {
+          "prospective_current_ka": 39.928984,
+          "conservative_i2t_a2s": 617142.754
+        },
+        {
+          "prospective_current_ka": 40.402775,
+          "conservative_i2t_a2s": 617627.696
+        },
+        {
+          "prospective_current_ka": 40.883275,
+          "conservative_i2t_a2s": 618110.143
+        },
+        {
+          "prospective_current_ka": 41.370481,
+          "conservative_i2t_a2s": 618590.057
+        },
+        {
+          "prospective_current_ka": 41.864391,
+          "conservative_i2t_a2s": 619067.399
+        },
+        {
+          "prospective_current_ka": 42.364996,
+          "conservative_i2t_a2s": 619542.13
+        },
+        {
+          "prospective_current_ka": 42.872287,
+          "conservative_i2t_a2s": 620014.214
+        },
+        {
+          "prospective_current_ka": 43.386248,
+          "conservative_i2t_a2s": 620483.61
+        },
+        {
+          "prospective_current_ka": 43.906862,
+          "conservative_i2t_a2s": 620950.281
+        },
+        {
+          "prospective_current_ka": 44.434106,
+          "conservative_i2t_a2s": 621414.187
+        },
+        {
+          "prospective_current_ka": 44.967954,
+          "conservative_i2t_a2s": 621875.291
+        },
+        {
+          "prospective_current_ka": 45.508375,
+          "conservative_i2t_a2s": 622333.552
+        },
+        {
+          "prospective_current_ka": 46.055334,
+          "conservative_i2t_a2s": 622788.933
+        },
+        {
+          "prospective_current_ka": 46.608791,
+          "conservative_i2t_a2s": 623241.394
+        },
+        {
+          "prospective_current_ka": 47.168702,
+          "conservative_i2t_a2s": 623690.897
+        },
+        {
+          "prospective_current_ka": 47.735017,
+          "conservative_i2t_a2s": 624137.403
+        },
+        {
+          "prospective_current_ka": 48.307682,
+          "conservative_i2t_a2s": 624580.872
+        },
+        {
+          "prospective_current_ka": 48.886636,
+          "conservative_i2t_a2s": 625021.265
+        },
+        {
+          "prospective_current_ka": 49.471816,
+          "conservative_i2t_a2s": 625458.543
+        },
+        {
+          "prospective_current_ka": 50.063149,
+          "conservative_i2t_a2s": 625892.668
+        }
+      ]
+    },
+    {
+      "curve_index": 2,
+      "applicable_frames": [
+        "CVS250"
+      ],
+      "vector_bbox": {
+        "x0": 131.1624,
+        "x1": 227.6644,
+        "top": 601.3041,
+        "bottom": 624.3981
+      },
+      "sample_count": 241,
+      "points": [
+        {
+          "prospective_current_ka": 4.989851,
+          "conservative_i2t_a2s": 310402.664
+        },
+        {
+          "prospective_current_ka": 4.990689,
+          "conservative_i2t_a2s": 310456.628
+        },
+        {
+          "prospective_current_ka": 4.99318,
+          "conservative_i2t_a2s": 310616.985
+        },
+        {
+          "prospective_current_ka": 4.997293,
+          "conservative_i2t_a2s": 310881.515
+        },
+        {
+          "prospective_current_ka": 5.002998,
+          "conservative_i2t_a2s": 311248.093
+        },
+        {
+          "prospective_current_ka": 5.010267,
+          "conservative_i2t_a2s": 311714.689
+        },
+        {
+          "prospective_current_ka": 5.019072,
+          "conservative_i2t_a2s": 312279.353
+        },
+        {
+          "prospective_current_ka": 5.029387,
+          "conservative_i2t_a2s": 312940.214
+        },
+        {
+          "prospective_current_ka": 5.041187,
+          "conservative_i2t_a2s": 313695.468
+        },
+        {
+          "prospective_current_ka": 5.054449,
+          "conservative_i2t_a2s": 314543.38
+        },
+        {
+          "prospective_current_ka": 5.069148,
+          "conservative_i2t_a2s": 315482.267
+        },
+        {
+          "prospective_current_ka": 5.085264,
+          "conservative_i2t_a2s": 316510.5
+        },
+        {
+          "prospective_current_ka": 5.102773,
+          "conservative_i2t_a2s": 317626.497
+        },
+        {
+          "prospective_current_ka": 5.121657,
+          "conservative_i2t_a2s": 318828.713
+        },
+        {
+          "prospective_current_ka": 5.141894,
+          "conservative_i2t_a2s": 320115.64
+        },
+        {
+          "prospective_current_ka": 5.163465,
+          "conservative_i2t_a2s": 321485.798
+        },
+        {
+          "prospective_current_ka": 5.186351,
+          "conservative_i2t_a2s": 322937.73
+        },
+        {
+          "prospective_current_ka": 5.210534,
+          "conservative_i2t_a2s": 324470.001
+        },
+        {
+          "prospective_current_ka": 5.235994,
+          "conservative_i2t_a2s": 326081.186
+        },
+        {
+          "prospective_current_ka": 5.262713,
+          "conservative_i2t_a2s": 327769.872
+        },
+        {
+          "prospective_current_ka": 5.290675,
+          "conservative_i2t_a2s": 329534.648
+        },
+        {
+          "prospective_current_ka": 5.31986,
+          "conservative_i2t_a2s": 331374.105
+        },
+        {
+          "prospective_current_ka": 5.350251,
+          "conservative_i2t_a2s": 333286.826
+        },
+        {
+          "prospective_current_ka": 5.381831,
+          "conservative_i2t_a2s": 335271.387
+        },
+        {
+          "prospective_current_ka": 5.414582,
+          "conservative_i2t_a2s": 337326.347
+        },
+        {
+          "prospective_current_ka": 5.448485,
+          "conservative_i2t_a2s": 339450.248
+        },
+        {
+          "prospective_current_ka": 5.483522,
+          "conservative_i2t_a2s": 341641.61
+        },
+        {
+          "prospective_current_ka": 5.519676,
+          "conservative_i2t_a2s": 343898.925
+        },
+        {
+          "prospective_current_ka": 5.556927,
+          "conservative_i2t_a2s": 346220.653
+        },
+        {
+          "prospective_current_ka": 5.595257,
+          "conservative_i2t_a2s": 348605.22
+        },
+        {
+          "prospective_current_ka": 5.634646,
+          "conservative_i2t_a2s": 351051.011
+        },
+        {
+          "prospective_current_ka": 5.675074,
+          "conservative_i2t_a2s": 353556.368
+        },
+        {
+          "prospective_current_ka": 5.71652,
+          "conservative_i2t_a2s": 356119.586
+        },
+        {
+          "prospective_current_ka": 5.758964,
+          "conservative_i2t_a2s": 358738.909
+        },
+        {
+          "prospective_current_ka": 5.802384,
+          "conservative_i2t_a2s": 361412.525
+        },
+        {
+          "prospective_current_ka": 5.846758,
+          "conservative_i2t_a2s": 364138.565
+        },
+        {
+          "prospective_current_ka": 5.892061,
+          "conservative_i2t_a2s": 366915.094
+        },
+        {
+          "prospective_current_ka": 5.938271,
+          "conservative_i2t_a2s": 369740.115
+        },
+        {
+          "prospective_current_ka": 5.985363,
+          "conservative_i2t_a2s": 372611.561
+        },
+        {
+          "prospective_current_ka": 6.03331,
+          "conservative_i2t_a2s": 375527.291
+        },
+        {
+          "prospective_current_ka": 6.082085,
+          "conservative_i2t_a2s": 378485.088
+        },
+        {
+          "prospective_current_ka": 6.131662,
+          "conservative_i2t_a2s": 381482.659
+        },
+        {
+          "prospective_current_ka": 6.182011,
+          "conservative_i2t_a2s": 384517.627
+        },
+        {
+          "prospective_current_ka": 6.233103,
+          "conservative_i2t_a2s": 387587.531
+        },
+        {
+          "prospective_current_ka": 6.284905,
+          "conservative_i2t_a2s": 390689.821
+        },
+        {
+          "prospective_current_ka": 6.337387,
+          "conservative_i2t_a2s": 393821.861
+        },
+        {
+          "prospective_current_ka": 6.390513,
+          "conservative_i2t_a2s": 396980.92
+        },
+        {
+          "prospective_current_ka": 6.44425,
+          "conservative_i2t_a2s": 400164.173
+        },
+        {
+          "prospective_current_ka": 6.498561,
+          "conservative_i2t_a2s": 403368.7
+        },
+        {
+          "prospective_current_ka": 6.553409,
+          "conservative_i2t_a2s": 406591.483
+        },
+        {
+          "prospective_current_ka": 6.608753,
+          "conservative_i2t_a2s": 409829.404
+        },
+        {
+          "prospective_current_ka": 6.664555,
+          "conservative_i2t_a2s": 413079.243
+        },
+        {
+          "prospective_current_ka": 6.720772,
+          "conservative_i2t_a2s": 416337.682
+        },
+        {
+          "prospective_current_ka": 6.77736,
+          "conservative_i2t_a2s": 419601.297
+        },
+        {
+          "prospective_current_ka": 6.834275,
+          "conservative_i2t_a2s": 422866.561
+        },
+        {
+          "prospective_current_ka": 6.89147,
+          "conservative_i2t_a2s": 426129.847
+        },
+        {
+          "prospective_current_ka": 6.948897,
+          "conservative_i2t_a2s": 429387.422
+        },
+        {
+          "prospective_current_ka": 7.006505,
+          "conservative_i2t_a2s": 432635.45
+        },
+        {
+          "prospective_current_ka": 7.064245,
+          "conservative_i2t_a2s": 435869.995
+        },
+        {
+          "prospective_current_ka": 7.122062,
+          "conservative_i2t_a2s": 439087.018
+        },
+        {
+          "prospective_current_ka": 7.179902,
+          "conservative_i2t_a2s": 442282.382
+        },
+        {
+          "prospective_current_ka": 7.23771,
+          "conservative_i2t_a2s": 445451.852
+        },
+        {
+          "prospective_current_ka": 7.295426,
+          "conservative_i2t_a2s": 448591.097
+        },
+        {
+          "prospective_current_ka": 7.352992,
+          "conservative_i2t_a2s": 451695.694
+        },
+        {
+          "prospective_current_ka": 7.410346,
+          "conservative_i2t_a2s": 454761.128
+        },
+        {
+          "prospective_current_ka": 7.467426,
+          "conservative_i2t_a2s": 457782.799
+        },
+        {
+          "prospective_current_ka": 7.524167,
+          "conservative_i2t_a2s": 460756.027
+        },
+        {
+          "prospective_current_ka": 7.580504,
+          "conservative_i2t_a2s": 463676.048
+        },
+        {
+          "prospective_current_ka": 7.636369,
+          "conservative_i2t_a2s": 466538.029
+        },
+        {
+          "prospective_current_ka": 7.691694,
+          "conservative_i2t_a2s": 469337.068
+        },
+        {
+          "prospective_current_ka": 7.746407,
+          "conservative_i2t_a2s": 472068.198
+        },
+        {
+          "prospective_current_ka": 7.800438,
+          "conservative_i2t_a2s": 474726.399
+        },
+        {
+          "prospective_current_ka": 7.853714,
+          "conservative_i2t_a2s": 477306.597
+        },
+        {
+          "prospective_current_ka": 7.90616,
+          "conservative_i2t_a2s": 479803.679
+        },
+        {
+          "prospective_current_ka": 7.957701,
+          "conservative_i2t_a2s": 482212.495
+        },
+        {
+          "prospective_current_ka": 8.00826,
+          "conservative_i2t_a2s": 484527.868
+        },
+        {
+          "prospective_current_ka": 8.057759,
+          "conservative_i2t_a2s": 486744.601
+        },
+        {
+          "prospective_current_ka": 8.10612,
+          "conservative_i2t_a2s": 488857.49
+        },
+        {
+          "prospective_current_ka": 8.153264,
+          "conservative_i2t_a2s": 490861.329
+        },
+        {
+          "prospective_current_ka": 8.19911,
+          "conservative_i2t_a2s": 492750.921
+        },
+        {
+          "prospective_current_ka": 8.243577,
+          "conservative_i2t_a2s": 494521.09
+        },
+        {
+          "prospective_current_ka": 8.288325,
+          "conservative_i2t_a2s": 496270.492
+        },
+        {
+          "prospective_current_ka": 8.335081,
+          "conservative_i2t_a2s": 498100.261
+        },
+        {
+          "prospective_current_ka": 8.383848,
+          "conservative_i2t_a2s": 500008.961
+        },
+        {
+          "prospective_current_ka": 8.43463,
+          "conservative_i2t_a2s": 501995.158
+        },
+        {
+          "prospective_current_ka": 8.48743,
+          "conservative_i2t_a2s": 504057.42
+        },
+        {
+          "prospective_current_ka": 8.542253,
+          "conservative_i2t_a2s": 506194.312
+        },
+        {
+          "prospective_current_ka": 8.599104,
+          "conservative_i2t_a2s": 508404.394
+        },
+        {
+          "prospective_current_ka": 8.657989,
+          "conservative_i2t_a2s": 510686.217
+        },
+        {
+          "prospective_current_ka": 8.718915,
+          "conservative_i2t_a2s": 513038.322
+        },
+        {
+          "prospective_current_ka": 8.781888,
+          "conservative_i2t_a2s": 515459.234
+        },
+        {
+          "prospective_current_ka": 8.846916,
+          "conservative_i2t_a2s": 517947.465
+        },
+        {
+          "prospective_current_ka": 8.914007,
+          "conservative_i2t_a2s": 520501.506
+        },
+        {
+          "prospective_current_ka": 8.983171,
+          "conservative_i2t_a2s": 523119.827
+        },
+        {
+          "prospective_current_ka": 9.054415,
+          "conservative_i2t_a2s": 525800.874
+        },
+        {
+          "prospective_current_ka": 9.12775,
+          "conservative_i2t_a2s": 528543.068
+        },
+        {
+          "prospective_current_ka": 9.203185,
+          "conservative_i2t_a2s": 531344.798
+        },
+        {
+          "prospective_current_ka": 9.280731,
+          "conservative_i2t_a2s": 534204.425
+        },
+        {
+          "prospective_current_ka": 9.360398,
+          "conservative_i2t_a2s": 537120.274
+        },
+        {
+          "prospective_current_ka": 9.442196,
+          "conservative_i2t_a2s": 540090.637
+        },
+        {
+          "prospective_current_ka": 9.526138,
+          "conservative_i2t_a2s": 543113.765
+        },
+        {
+          "prospective_current_ka": 9.612233,
+          "conservative_i2t_a2s": 546187.871
+        },
+        {
+          "prospective_current_ka": 9.700494,
+          "conservative_i2t_a2s": 549311.124
+        },
+        {
+          "prospective_current_ka": 9.790932,
+          "conservative_i2t_a2s": 552481.651
+        },
+        {
+          "prospective_current_ka": 9.883559,
+          "conservative_i2t_a2s": 555697.529
+        },
+        {
+          "prospective_current_ka": 9.978386,
+          "conservative_i2t_a2s": 558956.792
+        },
+        {
+          "prospective_current_ka": 10.075425,
+          "conservative_i2t_a2s": 562257.418
+        },
+        {
+          "prospective_current_ka": 10.174687,
+          "conservative_i2t_a2s": 565597.338
+        },
+        {
+          "prospective_current_ka": 10.276186,
+          "conservative_i2t_a2s": 568974.426
+        },
+        {
+          "prospective_current_ka": 10.37993,
+          "conservative_i2t_a2s": 572386.503
+        },
+        {
+          "prospective_current_ka": 10.485934,
+          "conservative_i2t_a2s": 575831.331
+        },
+        {
+          "prospective_current_ka": 10.594206,
+          "conservative_i2t_a2s": 579306.615
+        },
+        {
+          "prospective_current_ka": 10.704759,
+          "conservative_i2t_a2s": 582810.002
+        },
+        {
+          "prospective_current_ka": 10.817603,
+          "conservative_i2t_a2s": 586339.073
+        },
+        {
+          "prospective_current_ka": 10.932749,
+          "conservative_i2t_a2s": 589891.353
+        },
+        {
+          "prospective_current_ka": 11.050206,
+          "conservative_i2t_a2s": 593464.298
+        },
+        {
+          "prospective_current_ka": 11.169983,
+          "conservative_i2t_a2s": 597055.303
+        },
+        {
+          "prospective_current_ka": 11.292091,
+          "conservative_i2t_a2s": 600661.698
+        },
+        {
+          "prospective_current_ka": 11.416538,
+          "conservative_i2t_a2s": 604280.744
+        },
+        {
+          "prospective_current_ka": 11.543332,
+          "conservative_i2t_a2s": 607909.639
+        },
+        {
+          "prospective_current_ka": 11.672479,
+          "conservative_i2t_a2s": 611545.512
+        },
+        {
+          "prospective_current_ka": 11.803988,
+          "conservative_i2t_a2s": 615185.425
+        },
+        {
+          "prospective_current_ka": 11.937863,
+          "conservative_i2t_a2s": 618826.371
+        },
+        {
+          "prospective_current_ka": 12.07411,
+          "conservative_i2t_a2s": 622465.277
+        },
+        {
+          "prospective_current_ka": 12.212734,
+          "conservative_i2t_a2s": 626099.002
+        },
+        {
+          "prospective_current_ka": 12.353739,
+          "conservative_i2t_a2s": 629724.335
+        },
+        {
+          "prospective_current_ka": 12.497125,
+          "conservative_i2t_a2s": 633338.001
+        },
+        {
+          "prospective_current_ka": 12.642896,
+          "conservative_i2t_a2s": 636936.657
+        },
+        {
+          "prospective_current_ka": 12.791051,
+          "conservative_i2t_a2s": 640516.893
+        },
+        {
+          "prospective_current_ka": 12.941591,
+          "conservative_i2t_a2s": 644075.236
+        },
+        {
+          "prospective_current_ka": 13.094512,
+          "conservative_i2t_a2s": 647608.147
+        },
+        {
+          "prospective_current_ka": 13.249812,
+          "conservative_i2t_a2s": 651112.025
+        },
+        {
+          "prospective_current_ka": 13.407487,
+          "conservative_i2t_a2s": 654583.208
+        },
+        {
+          "prospective_current_ka": 13.56753,
+          "conservative_i2t_a2s": 658017.974
+        },
+        {
+          "prospective_current_ka": 13.729934,
+          "conservative_i2t_a2s": 661412.543
+        },
+        {
+          "prospective_current_ka": 13.894691,
+          "conservative_i2t_a2s": 664763.08
+        },
+        {
+          "prospective_current_ka": 14.06179,
+          "conservative_i2t_a2s": 668065.695
+        },
+        {
+          "prospective_current_ka": 14.231218,
+          "conservative_i2t_a2s": 671316.448
+        },
+        {
+          "prospective_current_ka": 14.402963,
+          "conservative_i2t_a2s": 674511.35
+        },
+        {
+          "prospective_current_ka": 14.577007,
+          "conservative_i2t_a2s": 677646.368
+        },
+        {
+          "prospective_current_ka": 14.753335,
+          "conservative_i2t_a2s": 680717.424
+        },
+        {
+          "prospective_current_ka": 14.931925,
+          "conservative_i2t_a2s": 683720.403
+        },
+        {
+          "prospective_current_ka": 15.112758,
+          "conservative_i2t_a2s": 686651.154
+        },
+        {
+          "prospective_current_ka": 15.295809,
+          "conservative_i2t_a2s": 689505.495
+        },
+        {
+          "prospective_current_ka": 15.481052,
+          "conservative_i2t_a2s": 692279.214
+        },
+        {
+          "prospective_current_ka": 15.668459,
+          "conservative_i2t_a2s": 694968.079
+        },
+        {
+          "prospective_current_ka": 15.858,
+          "conservative_i2t_a2s": 697567.838
+        },
+        {
+          "prospective_current_ka": 16.049643,
+          "conservative_i2t_a2s": 700074.222
+        },
+        {
+          "prospective_current_ka": 16.243352,
+          "conservative_i2t_a2s": 702482.956
+        },
+        {
+          "prospective_current_ka": 16.43909,
+          "conservative_i2t_a2s": 704789.761
+        },
+        {
+          "prospective_current_ka": 16.636816,
+          "conservative_i2t_a2s": 706990.356
+        },
+        {
+          "prospective_current_ka": 16.836487,
+          "conservative_i2t_a2s": 709080.471
+        },
+        {
+          "prospective_current_ka": 17.038059,
+          "conservative_i2t_a2s": 711055.845
+        },
+        {
+          "prospective_current_ka": 17.241481,
+          "conservative_i2t_a2s": 712912.238
+        },
+        {
+          "prospective_current_ka": 17.446703,
+          "conservative_i2t_a2s": 714645.434
+        },
+        {
+          "prospective_current_ka": 17.653672,
+          "conservative_i2t_a2s": 716251.247
+        },
+        {
+          "prospective_current_ka": 17.862328,
+          "conservative_i2t_a2s": 717725.53
+        },
+        {
+          "prospective_current_ka": 18.072613,
+          "conservative_i2t_a2s": 719064.18
+        },
+        {
+          "prospective_current_ka": 18.284463,
+          "conservative_i2t_a2s": 720263.146
+        },
+        {
+          "prospective_current_ka": 18.497811,
+          "conservative_i2t_a2s": 721318.434
+        },
+        {
+          "prospective_current_ka": 18.712587,
+          "conservative_i2t_a2s": 722226.115
+        },
+        {
+          "prospective_current_ka": 18.842485,
+          "conservative_i2t_a2s": 722728.443
+        },
+        {
+          "prospective_current_ka": 18.977595,
+          "conservative_i2t_a2s": 723252.534
+        },
+        {
+          "prospective_current_ka": 19.117952,
+          "conservative_i2t_a2s": 723798.033
+        },
+        {
+          "prospective_current_ka": 19.263592,
+          "conservative_i2t_a2s": 724364.584
+        },
+        {
+          "prospective_current_ka": 19.414556,
+          "conservative_i2t_a2s": 724951.831
+        },
+        {
+          "prospective_current_ka": 19.570883,
+          "conservative_i2t_a2s": 725559.419
+        },
+        {
+          "prospective_current_ka": 19.732619,
+          "conservative_i2t_a2s": 726186.995
+        },
+        {
+          "prospective_current_ka": 19.899809,
+          "conservative_i2t_a2s": 726834.203
+        },
+        {
+          "prospective_current_ka": 20.072502,
+          "conservative_i2t_a2s": 727500.689
+        },
+        {
+          "prospective_current_ka": 20.250746,
+          "conservative_i2t_a2s": 728186.1
+        },
+        {
+          "prospective_current_ka": 20.434595,
+          "conservative_i2t_a2s": 728890.082
+        },
+        {
+          "prospective_current_ka": 20.624102,
+          "conservative_i2t_a2s": 729612.281
+        },
+        {
+          "prospective_current_ka": 20.819323,
+          "conservative_i2t_a2s": 730352.341
+        },
+        {
+          "prospective_current_ka": 21.020316,
+          "conservative_i2t_a2s": 731109.909
+        },
+        {
+          "prospective_current_ka": 21.227142,
+          "conservative_i2t_a2s": 731884.63
+        },
+        {
+          "prospective_current_ka": 21.43986,
+          "conservative_i2t_a2s": 732676.147
+        },
+        {
+          "prospective_current_ka": 21.658534,
+          "conservative_i2t_a2s": 733484.105
+        },
+        {
+          "prospective_current_ka": 21.883228,
+          "conservative_i2t_a2s": 734308.147
+        },
+        {
+          "prospective_current_ka": 22.114009,
+          "conservative_i2t_a2s": 735147.915
+        },
+        {
+          "prospective_current_ka": 22.350945,
+          "conservative_i2t_a2s": 736003.051
+        },
+        {
+          "prospective_current_ka": 22.594104,
+          "conservative_i2t_a2s": 736873.195
+        },
+        {
+          "prospective_current_ka": 22.843557,
+          "conservative_i2t_a2s": 737757.987
+        },
+        {
+          "prospective_current_ka": 23.099375,
+          "conservative_i2t_a2s": 738657.065
+        },
+        {
+          "prospective_current_ka": 23.361632,
+          "conservative_i2t_a2s": 739570.067
+        },
+        {
+          "prospective_current_ka": 23.630402,
+          "conservative_i2t_a2s": 740496.629
+        },
+        {
+          "prospective_current_ka": 23.90576,
+          "conservative_i2t_a2s": 741436.386
+        },
+        {
+          "prospective_current_ka": 24.187782,
+          "conservative_i2t_a2s": 742388.971
+        },
+        {
+          "prospective_current_ka": 24.476545,
+          "conservative_i2t_a2s": 743354.016
+        },
+        {
+          "prospective_current_ka": 24.772127,
+          "conservative_i2t_a2s": 744331.151
+        },
+        {
+          "prospective_current_ka": 25.074608,
+          "conservative_i2t_a2s": 745320.006
+        },
+        {
+          "prospective_current_ka": 25.384066,
+          "conservative_i2t_a2s": 746320.207
+        },
+        {
+          "prospective_current_ka": 25.700582,
+          "conservative_i2t_a2s": 747331.381
+        },
+        {
+          "prospective_current_ka": 26.024236,
+          "conservative_i2t_a2s": 748353.151
+        },
+        {
+          "prospective_current_ka": 26.355109,
+          "conservative_i2t_a2s": 749385.138
+        },
+        {
+          "prospective_current_ka": 26.693282,
+          "conservative_i2t_a2s": 750426.964
+        },
+        {
+          "prospective_current_ka": 27.038837,
+          "conservative_i2t_a2s": 751478.246
+        },
+        {
+          "prospective_current_ka": 27.391855,
+          "conservative_i2t_a2s": 752538.6
+        },
+        {
+          "prospective_current_ka": 27.752417,
+          "conservative_i2t_a2s": 753607.64
+        },
+        {
+          "prospective_current_ka": 28.120606,
+          "conservative_i2t_a2s": 754684.979
+        },
+        {
+          "prospective_current_ka": 28.496501,
+          "conservative_i2t_a2s": 755770.226
+        },
+        {
+          "prospective_current_ka": 28.880184,
+          "conservative_i2t_a2s": 756862.99
+        },
+        {
+          "prospective_current_ka": 29.271735,
+          "conservative_i2t_a2s": 757962.875
+        },
+        {
+          "prospective_current_ka": 29.671232,
+          "conservative_i2t_a2s": 759069.485
+        },
+        {
+          "prospective_current_ka": 30.078755,
+          "conservative_i2t_a2s": 760182.421
+        },
+        {
+          "prospective_current_ka": 30.494382,
+          "conservative_i2t_a2s": 761301.282
+        },
+        {
+          "prospective_current_ka": 30.918188,
+          "conservative_i2t_a2s": 762425.664
+        },
+        {
+          "prospective_current_ka": 31.350248,
+          "conservative_i2t_a2s": 763555.161
+        },
+        {
+          "prospective_current_ka": 31.790638,
+          "conservative_i2t_a2s": 764689.365
+        },
+        {
+          "prospective_current_ka": 32.239429,
+          "conservative_i2t_a2s": 765827.864
+        },
+        {
+          "prospective_current_ka": 32.696691,
+          "conservative_i2t_a2s": 766970.246
+        },
+        {
+          "prospective_current_ka": 33.162493,
+          "conservative_i2t_a2s": 768116.093
+        },
+        {
+          "prospective_current_ka": 33.636901,
+          "conservative_i2t_a2s": 769264.989
+        },
+        {
+          "prospective_current_ka": 34.11998,
+          "conservative_i2t_a2s": 770416.512
+        },
+        {
+          "prospective_current_ka": 34.611791,
+          "conservative_i2t_a2s": 771570.238
+        },
+        {
+          "prospective_current_ka": 35.112392,
+          "conservative_i2t_a2s": 772725.742
+        },
+        {
+          "prospective_current_ka": 35.621841,
+          "conservative_i2t_a2s": 773882.595
+        },
+        {
+          "prospective_current_ka": 36.140188,
+          "conservative_i2t_a2s": 775040.365
+        },
+        {
+          "prospective_current_ka": 36.667485,
+          "conservative_i2t_a2s": 776198.62
+        },
+        {
+          "prospective_current_ka": 37.203776,
+          "conservative_i2t_a2s": 777356.922
+        },
+        {
+          "prospective_current_ka": 37.749105,
+          "conservative_i2t_a2s": 778514.833
+        },
+        {
+          "prospective_current_ka": 38.303508,
+          "conservative_i2t_a2s": 779671.911
+        },
+        {
+          "prospective_current_ka": 38.86702,
+          "conservative_i2t_a2s": 780827.713
+        },
+        {
+          "prospective_current_ka": 39.43967,
+          "conservative_i2t_a2s": 781981.79
+        },
+        {
+          "prospective_current_ka": 40.021482,
+          "conservative_i2t_a2s": 783133.695
+        },
+        {
+          "prospective_current_ka": 40.612477,
+          "conservative_i2t_a2s": 784282.976
+        },
+        {
+          "prospective_current_ka": 41.212667,
+          "conservative_i2t_a2s": 785429.177
+        },
+        {
+          "prospective_current_ka": 41.822062,
+          "conservative_i2t_a2s": 786571.843
+        },
+        {
+          "prospective_current_ka": 42.440665,
+          "conservative_i2t_a2s": 787710.513
+        },
+        {
+          "prospective_current_ka": 43.068473,
+          "conservative_i2t_a2s": 788844.726
+        },
+        {
+          "prospective_current_ka": 43.705475,
+          "conservative_i2t_a2s": 789974.017
+        },
+        {
+          "prospective_current_ka": 44.351655,
+          "conservative_i2t_a2s": 791097.92
+        },
+        {
+          "prospective_current_ka": 45.006991,
+          "conservative_i2t_a2s": 792215.965
+        },
+        {
+          "prospective_current_ka": 45.671452,
+          "conservative_i2t_a2s": 793327.681
+        },
+        {
+          "prospective_current_ka": 46.345001,
+          "conservative_i2t_a2s": 794432.595
+        },
+        {
+          "prospective_current_ka": 47.02759,
+          "conservative_i2t_a2s": 795530.228
+        },
+        {
+          "prospective_current_ka": 47.719167,
+          "conservative_i2t_a2s": 796620.104
+        },
+        {
+          "prospective_current_ka": 48.41967,
+          "conservative_i2t_a2s": 797701.742
+        },
+        {
+          "prospective_current_ka": 49.129027,
+          "conservative_i2t_a2s": 798774.658
+        },
+        {
+          "prospective_current_ka": 49.847158,
+          "conservative_i2t_a2s": 799838.368
+        },
+        {
+          "prospective_current_ka": 50.573975,
+          "conservative_i2t_a2s": 800892.384
+        }
+      ]
+    },
+    {
+      "curve_index": 3,
+      "applicable_frames": [
+        "CVS400"
+      ],
+      "vector_bbox": {
+        "x0": 151.4644,
+        "x1": 240.7984,
+        "top": 571.6741,
+        "bottom": 596.4831
+      },
+      "sample_count": 161,
+      "points": [
+        {
+          "prospective_current_ka": 8.122602,
+          "conservative_i2t_a2s": 976131.005
+        },
+        {
+          "prospective_current_ka": 8.123642,
+          "conservative_i2t_a2s": 976398.531
+        },
+        {
+          "prospective_current_ka": 8.126794,
+          "conservative_i2t_a2s": 977194.431
+        },
+        {
+          "prospective_current_ka": 8.132107,
+          "conservative_i2t_a2s": 978509.308
+        },
+        {
+          "prospective_current_ka": 8.139635,
+          "conservative_i2t_a2s": 980334.548
+        },
+        {
+          "prospective_current_ka": 8.149429,
+          "conservative_i2t_a2s": 982662.264
+        },
+        {
+          "prospective_current_ka": 8.161546,
+          "conservative_i2t_a2s": 985485.253
+        },
+        {
+          "prospective_current_ka": 8.176043,
+          "conservative_i2t_a2s": 988796.949
+        },
+        {
+          "prospective_current_ka": 8.192981,
+          "conservative_i2t_a2s": 992591.376
+        },
+        {
+          "prospective_current_ka": 8.212423,
+          "conservative_i2t_a2s": 996863.112
+        },
+        {
+          "prospective_current_ka": 8.234434,
+          "conservative_i2t_a2s": 1001607.247
+        },
+        {
+          "prospective_current_ka": 8.259082,
+          "conservative_i2t_a2s": 1006819.344
+        },
+        {
+          "prospective_current_ka": 8.28644,
+          "conservative_i2t_a2s": 1012495.403
+        },
+        {
+          "prospective_current_ka": 8.316581,
+          "conservative_i2t_a2s": 1018631.827
+        },
+        {
+          "prospective_current_ka": 8.349585,
+          "conservative_i2t_a2s": 1025225.385
+        },
+        {
+          "prospective_current_ka": 8.385533,
+          "conservative_i2t_a2s": 1032273.183
+        },
+        {
+          "prospective_current_ka": 8.424511,
+          "conservative_i2t_a2s": 1039772.626
+        },
+        {
+          "prospective_current_ka": 8.466609,
+          "conservative_i2t_a2s": 1047721.389
+        },
+        {
+          "prospective_current_ka": 8.511921,
+          "conservative_i2t_a2s": 1056117.388
+        },
+        {
+          "prospective_current_ka": 8.560547,
+          "conservative_i2t_a2s": 1064958.744
+        },
+        {
+          "prospective_current_ka": 8.61259,
+          "conservative_i2t_a2s": 1074243.759
+        },
+        {
+          "prospective_current_ka": 8.66816,
+          "conservative_i2t_a2s": 1083970.879
+        },
+        {
+          "prospective_current_ka": 8.727372,
+          "conservative_i2t_a2s": 1094138.668
+        },
+        {
+          "prospective_current_ka": 8.790346,
+          "conservative_i2t_a2s": 1104745.779
+        },
+        {
+          "prospective_current_ka": 8.857209,
+          "conservative_i2t_a2s": 1115790.92
+        },
+        {
+          "prospective_current_ka": 8.928096,
+          "conservative_i2t_a2s": 1127272.83
+        },
+        {
+          "prospective_current_ka": 9.003146,
+          "conservative_i2t_a2s": 1139190.242
+        },
+        {
+          "prospective_current_ka": 9.082507,
+          "conservative_i2t_a2s": 1151541.859
+        },
+        {
+          "prospective_current_ka": 9.166337,
+          "conservative_i2t_a2s": 1164326.319
+        },
+        {
+          "prospective_current_ka": 9.254798,
+          "conservative_i2t_a2s": 1177542.168
+        },
+        {
+          "prospective_current_ka": 9.348064,
+          "conservative_i2t_a2s": 1191187.825
+        },
+        {
+          "prospective_current_ka": 9.446319,
+          "conservative_i2t_a2s": 1205261.554
+        },
+        {
+          "prospective_current_ka": 9.549753,
+          "conservative_i2t_a2s": 1219761.433
+        },
+        {
+          "prospective_current_ka": 9.658572,
+          "conservative_i2t_a2s": 1234685.318
+        },
+        {
+          "prospective_current_ka": 9.772989,
+          "conservative_i2t_a2s": 1250030.813
+        },
+        {
+          "prospective_current_ka": 9.89323,
+          "conservative_i2t_a2s": 1265795.236
+        },
+        {
+          "prospective_current_ka": 10.019536,
+          "conservative_i2t_a2s": 1281975.589
+        },
+        {
+          "prospective_current_ka": 10.15216,
+          "conservative_i2t_a2s": 1298568.521
+        },
+        {
+          "prospective_current_ka": 10.291367,
+          "conservative_i2t_a2s": 1315570.292
+        },
+        {
+          "prospective_current_ka": 10.437442,
+          "conservative_i2t_a2s": 1332976.746
+        },
+        {
+          "prospective_current_ka": 10.590682,
+          "conservative_i2t_a2s": 1350783.268
+        },
+        {
+          "prospective_current_ka": 10.751405,
+          "conservative_i2t_a2s": 1368984.756
+        },
+        {
+          "prospective_current_ka": 10.919944,
+          "conservative_i2t_a2s": 1387575.579
+        },
+        {
+          "prospective_current_ka": 11.096655,
+          "conservative_i2t_a2s": 1406549.549
+        },
+        {
+          "prospective_current_ka": 11.281913,
+          "conservative_i2t_a2s": 1425899.877
+        },
+        {
+          "prospective_current_ka": 11.476116,
+          "conservative_i2t_a2s": 1445619.147
+        },
+        {
+          "prospective_current_ka": 11.679686,
+          "conservative_i2t_a2s": 1465699.272
+        },
+        {
+          "prospective_current_ka": 11.893069,
+          "conservative_i2t_a2s": 1486131.462
+        },
+        {
+          "prospective_current_ka": 12.11674,
+          "conservative_i2t_a2s": 1506906.19
+        },
+        {
+          "prospective_current_ka": 12.351204,
+          "conservative_i2t_a2s": 1528013.156
+        },
+        {
+          "prospective_current_ka": 12.596994,
+          "conservative_i2t_a2s": 1549441.252
+        },
+        {
+          "prospective_current_ka": 12.854679,
+          "conservative_i2t_a2s": 1571178.527
+        },
+        {
+          "prospective_current_ka": 13.124862,
+          "conservative_i2t_a2s": 1593212.158
+        },
+        {
+          "prospective_current_ka": 13.408185,
+          "conservative_i2t_a2s": 1615528.414
+        },
+        {
+          "prospective_current_ka": 13.705329,
+          "conservative_i2t_a2s": 1638112.627
+        },
+        {
+          "prospective_current_ka": 14.017021,
+          "conservative_i2t_a2s": 1660949.159
+        },
+        {
+          "prospective_current_ka": 14.344034,
+          "conservative_i2t_a2s": 1684021.378
+        },
+        {
+          "prospective_current_ka": 14.687189,
+          "conservative_i2t_a2s": 1707311.626
+        },
+        {
+          "prospective_current_ka": 15.047365,
+          "conservative_i2t_a2s": 1730801.197
+        },
+        {
+          "prospective_current_ka": 15.425494,
+          "conservative_i2t_a2s": 1754470.314
+        },
+        {
+          "prospective_current_ka": 15.822574,
+          "conservative_i2t_a2s": 1778298.105
+        },
+        {
+          "prospective_current_ka": 16.239667,
+          "conservative_i2t_a2s": 1802262.587
+        },
+        {
+          "prospective_current_ka": 16.677907,
+          "conservative_i2t_a2s": 1826340.647
+        },
+        {
+          "prospective_current_ka": 17.138507,
+          "conservative_i2t_a2s": 1850508.031
+        },
+        {
+          "prospective_current_ka": 17.62276,
+          "conservative_i2t_a2s": 1874739.336
+        },
+        {
+          "prospective_current_ka": 18.132051,
+          "conservative_i2t_a2s": 1899007.997
+        },
+        {
+          "prospective_current_ka": 18.667858,
+          "conservative_i2t_a2s": 1923286.287
+        },
+        {
+          "prospective_current_ka": 19.231765,
+          "conservative_i2t_a2s": 1947545.321
+        },
+        {
+          "prospective_current_ka": 19.825467,
+          "conservative_i2t_a2s": 1971755.053
+        },
+        {
+          "prospective_current_ka": 20.450779,
+          "conservative_i2t_a2s": 1995884.292
+        },
+        {
+          "prospective_current_ka": 21.109646,
+          "conservative_i2t_a2s": 2019900.71
+        },
+        {
+          "prospective_current_ka": 21.804154,
+          "conservative_i2t_a2s": 2043770.864
+        },
+        {
+          "prospective_current_ka": 22.536542,
+          "conservative_i2t_a2s": 2067460.216
+        },
+        {
+          "prospective_current_ka": 23.30921,
+          "conservative_i2t_a2s": 2090933.163
+        },
+        {
+          "prospective_current_ka": 24.124738,
+          "conservative_i2t_a2s": 2114153.071
+        },
+        {
+          "prospective_current_ka": 24.985899,
+          "conservative_i2t_a2s": 2137082.313
+        },
+        {
+          "prospective_current_ka": 25.895671,
+          "conservative_i2t_a2s": 2159682.313
+        },
+        {
+          "prospective_current_ka": 26.857262,
+          "conservative_i2t_a2s": 2181913.599
+        },
+        {
+          "prospective_current_ka": 27.874121,
+          "conservative_i2t_a2s": 2203735.859
+        },
+        {
+          "prospective_current_ka": 28.949964,
+          "conservative_i2t_a2s": 2225108.004
+        },
+        {
+          "prospective_current_ka": 30.088797,
+          "conservative_i2t_a2s": 2245988.236
+        },
+        {
+          "prospective_current_ka": 30.457668,
+          "conservative_i2t_a2s": 2252441.739
+        },
+        {
+          "prospective_current_ka": 30.829719,
+          "conservative_i2t_a2s": 2258880.38
+        },
+        {
+          "prospective_current_ka": 31.204955,
+          "conservative_i2t_a2s": 2265303.984
+        },
+        {
+          "prospective_current_ka": 31.583381,
+          "conservative_i2t_a2s": 2271712.379
+        },
+        {
+          "prospective_current_ka": 31.965002,
+          "conservative_i2t_a2s": 2278105.392
+        },
+        {
+          "prospective_current_ka": 32.349822,
+          "conservative_i2t_a2s": 2284482.849
+        },
+        {
+          "prospective_current_ka": 32.737844,
+          "conservative_i2t_a2s": 2290844.58
+        },
+        {
+          "prospective_current_ka": 33.129072,
+          "conservative_i2t_a2s": 2297190.413
+        },
+        {
+          "prospective_current_ka": 33.523508,
+          "conservative_i2t_a2s": 2303520.178
+        },
+        {
+          "prospective_current_ka": 33.921154,
+          "conservative_i2t_a2s": 2309833.706
+        },
+        {
+          "prospective_current_ka": 34.322013,
+          "conservative_i2t_a2s": 2316130.829
+        },
+        {
+          "prospective_current_ka": 34.726086,
+          "conservative_i2t_a2s": 2322411.378
+        },
+        {
+          "prospective_current_ka": 35.133374,
+          "conservative_i2t_a2s": 2328675.185
+        },
+        {
+          "prospective_current_ka": 35.543878,
+          "conservative_i2t_a2s": 2334922.085
+        },
+        {
+          "prospective_current_ka": 35.957597,
+          "conservative_i2t_a2s": 2341151.912
+        },
+        {
+          "prospective_current_ka": 36.374531,
+          "conservative_i2t_a2s": 2347364.501
+        },
+        {
+          "prospective_current_ka": 36.79468,
+          "conservative_i2t_a2s": 2353559.689
+        },
+        {
+          "prospective_current_ka": 37.218042,
+          "conservative_i2t_a2s": 2359737.31
+        },
+        {
+          "prospective_current_ka": 37.644615,
+          "conservative_i2t_a2s": 2365897.204
+        },
+        {
+          "prospective_current_ka": 38.074397,
+          "conservative_i2t_a2s": 2372039.209
+        },
+        {
+          "prospective_current_ka": 38.507386,
+          "conservative_i2t_a2s": 2378163.163
+        },
+        {
+          "prospective_current_ka": 38.943577,
+          "conservative_i2t_a2s": 2384268.907
+        },
+        {
+          "prospective_current_ka": 39.382967,
+          "conservative_i2t_a2s": 2390356.282
+        },
+        {
+          "prospective_current_ka": 39.825552,
+          "conservative_i2t_a2s": 2396425.129
+        },
+        {
+          "prospective_current_ka": 40.271327,
+          "conservative_i2t_a2s": 2402475.291
+        },
+        {
+          "prospective_current_ka": 40.720286,
+          "conservative_i2t_a2s": 2408506.611
+        },
+        {
+          "prospective_current_ka": 41.172424,
+          "conservative_i2t_a2s": 2414518.934
+        },
+        {
+          "prospective_current_ka": 41.627734,
+          "conservative_i2t_a2s": 2420512.105
+        },
+        {
+          "prospective_current_ka": 42.086209,
+          "conservative_i2t_a2s": 2426485.97
+        },
+        {
+          "prospective_current_ka": 42.547842,
+          "conservative_i2t_a2s": 2432440.377
+        },
+        {
+          "prospective_current_ka": 43.012625,
+          "conservative_i2t_a2s": 2438375.172
+        },
+        {
+          "prospective_current_ka": 43.480549,
+          "conservative_i2t_a2s": 2444290.205
+        },
+        {
+          "prospective_current_ka": 43.951604,
+          "conservative_i2t_a2s": 2450185.326
+        },
+        {
+          "prospective_current_ka": 44.425781,
+          "conservative_i2t_a2s": 2456060.385
+        },
+        {
+          "prospective_current_ka": 44.90307,
+          "conservative_i2t_a2s": 2461915.234
+        },
+        {
+          "prospective_current_ka": 45.38346,
+          "conservative_i2t_a2s": 2467749.725
+        },
+        {
+          "prospective_current_ka": 45.866939,
+          "conservative_i2t_a2s": 2473563.713
+        },
+        {
+          "prospective_current_ka": 46.353495,
+          "conservative_i2t_a2s": 2479357.052
+        },
+        {
+          "prospective_current_ka": 46.843115,
+          "conservative_i2t_a2s": 2485129.596
+        },
+        {
+          "prospective_current_ka": 47.335787,
+          "conservative_i2t_a2s": 2490881.203
+        },
+        {
+          "prospective_current_ka": 47.831496,
+          "conservative_i2t_a2s": 2496611.73
+        },
+        {
+          "prospective_current_ka": 48.330227,
+          "conservative_i2t_a2s": 2502321.036
+        },
+        {
+          "prospective_current_ka": 48.831967,
+          "conservative_i2t_a2s": 2508008.979
+        },
+        {
+          "prospective_current_ka": 49.336698,
+          "conservative_i2t_a2s": 2513675.421
+        },
+        {
+          "prospective_current_ka": 49.844405,
+          "conservative_i2t_a2s": 2519320.223
+        },
+        {
+          "prospective_current_ka": 50.355071,
+          "conservative_i2t_a2s": 2524943.247
+        },
+        {
+          "prospective_current_ka": 50.868678,
+          "conservative_i2t_a2s": 2530544.356
+        },
+        {
+          "prospective_current_ka": 51.385208,
+          "conservative_i2t_a2s": 2536123.416
+        },
+        {
+          "prospective_current_ka": 51.904642,
+          "conservative_i2t_a2s": 2541680.292
+        },
+        {
+          "prospective_current_ka": 52.42696,
+          "conservative_i2t_a2s": 2547214.85
+        },
+        {
+          "prospective_current_ka": 52.952143,
+          "conservative_i2t_a2s": 2552726.959
+        },
+        {
+          "prospective_current_ka": 53.480169,
+          "conservative_i2t_a2s": 2558216.486
+        },
+        {
+          "prospective_current_ka": 54.011018,
+          "conservative_i2t_a2s": 2563683.301
+        },
+        {
+          "prospective_current_ka": 54.544667,
+          "conservative_i2t_a2s": 2569127.277
+        },
+        {
+          "prospective_current_ka": 55.081093,
+          "conservative_i2t_a2s": 2574548.283
+        },
+        {
+          "prospective_current_ka": 55.620274,
+          "conservative_i2t_a2s": 2579946.194
+        },
+        {
+          "prospective_current_ka": 56.162184,
+          "conservative_i2t_a2s": 2585320.883
+        },
+        {
+          "prospective_current_ka": 56.7068,
+          "conservative_i2t_a2s": 2590672.225
+        },
+        {
+          "prospective_current_ka": 57.254096,
+          "conservative_i2t_a2s": 2596000.097
+        },
+        {
+          "prospective_current_ka": 57.804045,
+          "conservative_i2t_a2s": 2601304.377
+        },
+        {
+          "prospective_current_ka": 58.356622,
+          "conservative_i2t_a2s": 2606584.941
+        },
+        {
+          "prospective_current_ka": 58.911799,
+          "conservative_i2t_a2s": 2611841.671
+        },
+        {
+          "prospective_current_ka": 59.469547,
+          "conservative_i2t_a2s": 2617074.447
+        },
+        {
+          "prospective_current_ka": 60.029839,
+          "conservative_i2t_a2s": 2622283.151
+        },
+        {
+          "prospective_current_ka": 60.592644,
+          "conservative_i2t_a2s": 2627467.664
+        },
+        {
+          "prospective_current_ka": 61.157932,
+          "conservative_i2t_a2s": 2632627.873
+        },
+        {
+          "prospective_current_ka": 61.725674,
+          "conservative_i2t_a2s": 2637763.661
+        },
+        {
+          "prospective_current_ka": 62.295836,
+          "conservative_i2t_a2s": 2642874.915
+        },
+        {
+          "prospective_current_ka": 62.868388,
+          "conservative_i2t_a2s": 2647961.522
+        },
+        {
+          "prospective_current_ka": 63.443296,
+          "conservative_i2t_a2s": 2653023.372
+        },
+        {
+          "prospective_current_ka": 64.020527,
+          "conservative_i2t_a2s": 2658060.354
+        },
+        {
+          "prospective_current_ka": 64.600047,
+          "conservative_i2t_a2s": 2663072.358
+        },
+        {
+          "prospective_current_ka": 65.181821,
+          "conservative_i2t_a2s": 2668059.277
+        },
+        {
+          "prospective_current_ka": 65.765813,
+          "conservative_i2t_a2s": 2673021.004
+        },
+        {
+          "prospective_current_ka": 66.351986,
+          "conservative_i2t_a2s": 2677957.434
+        },
+        {
+          "prospective_current_ka": 66.940306,
+          "conservative_i2t_a2s": 2682868.462
+        },
+        {
+          "prospective_current_ka": 67.530732,
+          "conservative_i2t_a2s": 2687753.984
+        },
+        {
+          "prospective_current_ka": 68.123228,
+          "conservative_i2t_a2s": 2692613.899
+        },
+        {
+          "prospective_current_ka": 68.717754,
+          "conservative_i2t_a2s": 2697448.106
+        },
+        {
+          "prospective_current_ka": 69.31427,
+          "conservative_i2t_a2s": 2702256.505
+        }
+      ]
+    },
+    {
+      "curve_index": 4,
+      "applicable_frames": [
+        "CVS630"
+      ],
+      "vector_bbox": {
+        "x0": 158.0624,
+        "x1": 240.7924,
+        "top": 565.6151,
+        "bottom": 587.6011
+      },
+      "sample_count": 161,
+      "points": [
+        {
+          "prospective_current_ka": 9.516255,
+          "conservative_i2t_a2s": 1405494.192
+        },
+        {
+          "prospective_current_ka": 9.517858,
+          "conservative_i2t_a2s": 1405868.93
+        },
+        {
+          "prospective_current_ka": 9.522675,
+          "conservative_i2t_a2s": 1406982.865
+        },
+        {
+          "prospective_current_ka": 9.530712,
+          "conservative_i2t_a2s": 1408821.423
+        },
+        {
+          "prospective_current_ka": 9.541984,
+          "conservative_i2t_a2s": 1411371.075
+        },
+        {
+          "prospective_current_ka": 9.556506,
+          "conservative_i2t_a2s": 1414619.271
+        },
+        {
+          "prospective_current_ka": 9.574297,
+          "conservative_i2t_a2s": 1418554.364
+        },
+        {
+          "prospective_current_ka": 9.595379,
+          "conservative_i2t_a2s": 1423165.541
+        },
+        {
+          "prospective_current_ka": 9.61978,
+          "conservative_i2t_a2s": 1428442.754
+        },
+        {
+          "prospective_current_ka": 9.647528,
+          "conservative_i2t_a2s": 1434376.666
+        },
+        {
+          "prospective_current_ka": 9.678657,
+          "conservative_i2t_a2s": 1440958.582
+        },
+        {
+          "prospective_current_ka": 9.713203,
+          "conservative_i2t_a2s": 1448180.394
+        },
+        {
+          "prospective_current_ka": 9.751206,
+          "conservative_i2t_a2s": 1456034.526
+        },
+        {
+          "prospective_current_ka": 9.792711,
+          "conservative_i2t_a2s": 1464513.879
+        },
+        {
+          "prospective_current_ka": 9.837766,
+          "conservative_i2t_a2s": 1473611.777
+        },
+        {
+          "prospective_current_ka": 9.886423,
+          "conservative_i2t_a2s": 1483321.916
+        },
+        {
+          "prospective_current_ka": 9.938736,
+          "conservative_i2t_a2s": 1493638.315
+        },
+        {
+          "prospective_current_ka": 9.994768,
+          "conservative_i2t_a2s": 1504555.265
+        },
+        {
+          "prospective_current_ka": 10.054581,
+          "conservative_i2t_a2s": 1516067.284
+        },
+        {
+          "prospective_current_ka": 10.118244,
+          "conservative_i2t_a2s": 1528169.063
+        },
+        {
+          "prospective_current_ka": 10.185832,
+          "conservative_i2t_a2s": 1540855.424
+        },
+        {
+          "prospective_current_ka": 10.257421,
+          "conservative_i2t_a2s": 1554121.273
+        },
+        {
+          "prospective_current_ka": 10.333094,
+          "conservative_i2t_a2s": 1567961.552
+        },
+        {
+          "prospective_current_ka": 10.41294,
+          "conservative_i2t_a2s": 1582371.191
+        },
+        {
+          "prospective_current_ka": 10.49705,
+          "conservative_i2t_a2s": 1597345.069
+        },
+        {
+          "prospective_current_ka": 10.585522,
+          "conservative_i2t_a2s": 1612877.959
+        },
+        {
+          "prospective_current_ka": 10.678461,
+          "conservative_i2t_a2s": 1628964.491
+        },
+        {
+          "prospective_current_ka": 10.775976,
+          "conservative_i2t_a2s": 1645599.098
+        },
+        {
+          "prospective_current_ka": 10.878181,
+          "conservative_i2t_a2s": 1662775.978
+        },
+        {
+          "prospective_current_ka": 10.985199,
+          "conservative_i2t_a2s": 1680489.043
+        },
+        {
+          "prospective_current_ka": 11.097156,
+          "conservative_i2t_a2s": 1698731.872
+        },
+        {
+          "prospective_current_ka": 11.214188,
+          "conservative_i2t_a2s": 1717497.672
+        },
+        {
+          "prospective_current_ka": 11.336435,
+          "conservative_i2t_a2s": 1736779.222
+        },
+        {
+          "prospective_current_ka": 11.464047,
+          "conservative_i2t_a2s": 1756568.835
+        },
+        {
+          "prospective_current_ka": 11.597179,
+          "conservative_i2t_a2s": 1776858.307
+        },
+        {
+          "prospective_current_ka": 11.735995,
+          "conservative_i2t_a2s": 1797638.872
+        },
+        {
+          "prospective_current_ka": 11.880667,
+          "conservative_i2t_a2s": 1818901.156
+        },
+        {
+          "prospective_current_ka": 12.031376,
+          "conservative_i2t_a2s": 1840635.128
+        },
+        {
+          "prospective_current_ka": 12.188311,
+          "conservative_i2t_a2s": 1862830.059
+        },
+        {
+          "prospective_current_ka": 12.351671,
+          "conservative_i2t_a2s": 1885474.47
+        },
+        {
+          "prospective_current_ka": 12.521665,
+          "conservative_i2t_a2s": 1908556.092
+        },
+        {
+          "prospective_current_ka": 12.698511,
+          "conservative_i2t_a2s": 1932061.818
+        },
+        {
+          "prospective_current_ka": 12.882439,
+          "conservative_i2t_a2s": 1955977.657
+        },
+        {
+          "prospective_current_ka": 13.07369,
+          "conservative_i2t_a2s": 1980288.694
+        },
+        {
+          "prospective_current_ka": 13.272514,
+          "conservative_i2t_a2s": 2004979.043
+        },
+        {
+          "prospective_current_ka": 13.479178,
+          "conservative_i2t_a2s": 2030031.81
+        },
+        {
+          "prospective_current_ka": 13.693958,
+          "conservative_i2t_a2s": 2055429.045
+        },
+        {
+          "prospective_current_ka": 13.917145,
+          "conservative_i2t_a2s": 2081151.71
+        },
+        {
+          "prospective_current_ka": 14.149043,
+          "conservative_i2t_a2s": 2107179.638
+        },
+        {
+          "prospective_current_ka": 14.389973,
+          "conservative_i2t_a2s": 2133491.495
+        },
+        {
+          "prospective_current_ka": 14.64027,
+          "conservative_i2t_a2s": 2160064.751
+        },
+        {
+          "prospective_current_ka": 14.900284,
+          "conservative_i2t_a2s": 2186875.642
+        },
+        {
+          "prospective_current_ka": 15.170385,
+          "conservative_i2t_a2s": 2213899.146
+        },
+        {
+          "prospective_current_ka": 15.450959,
+          "conservative_i2t_a2s": 2241108.954
+        },
+        {
+          "prospective_current_ka": 15.742411,
+          "conservative_i2t_a2s": 2268477.449
+        },
+        {
+          "prospective_current_ka": 16.045167,
+          "conservative_i2t_a2s": 2295975.68
+        },
+        {
+          "prospective_current_ka": 16.359674,
+          "conservative_i2t_a2s": 2323573.353
+        },
+        {
+          "prospective_current_ka": 16.686399,
+          "conservative_i2t_a2s": 2351238.812
+        },
+        {
+          "prospective_current_ka": 17.025834,
+          "conservative_i2t_a2s": 2378939.035
+        },
+        {
+          "prospective_current_ka": 17.378494,
+          "conservative_i2t_a2s": 2406639.626
+        },
+        {
+          "prospective_current_ka": 17.744922,
+          "conservative_i2t_a2s": 2434304.819
+        },
+        {
+          "prospective_current_ka": 18.125686,
+          "conservative_i2t_a2s": 2461897.481
+        },
+        {
+          "prospective_current_ka": 18.521382,
+          "conservative_i2t_a2s": 2489379.123
+        },
+        {
+          "prospective_current_ka": 18.932638,
+          "conservative_i2t_a2s": 2516709.919
+        },
+        {
+          "prospective_current_ka": 19.360113,
+          "conservative_i2t_a2s": 2543848.727
+        },
+        {
+          "prospective_current_ka": 19.804497,
+          "conservative_i2t_a2s": 2570753.116
+        },
+        {
+          "prospective_current_ka": 20.266519,
+          "conservative_i2t_a2s": 2597379.403
+        },
+        {
+          "prospective_current_ka": 20.746943,
+          "conservative_i2t_a2s": 2623682.694
+        },
+        {
+          "prospective_current_ka": 21.246571,
+          "conservative_i2t_a2s": 2649616.934
+        },
+        {
+          "prospective_current_ka": 21.76625,
+          "conservative_i2t_a2s": 2675134.961
+        },
+        {
+          "prospective_current_ka": 22.306867,
+          "conservative_i2t_a2s": 2700188.569
+        },
+        {
+          "prospective_current_ka": 22.869357,
+          "conservative_i2t_a2s": 2724728.579
+        },
+        {
+          "prospective_current_ka": 23.454703,
+          "conservative_i2t_a2s": 2748704.92
+        },
+        {
+          "prospective_current_ka": 24.063939,
+          "conservative_i2t_a2s": 2772066.709
+        },
+        {
+          "prospective_current_ka": 24.698156,
+          "conservative_i2t_a2s": 2794762.349
+        },
+        {
+          "prospective_current_ka": 25.358499,
+          "conservative_i2t_a2s": 2816739.631
+        },
+        {
+          "prospective_current_ka": 26.046177,
+          "conservative_i2t_a2s": 2837945.842
+        },
+        {
+          "prospective_current_ka": 26.76246,
+          "conservative_i2t_a2s": 2858327.879
+        },
+        {
+          "prospective_current_ka": 27.50869,
+          "conservative_i2t_a2s": 2877832.381
+        },
+        {
+          "prospective_current_ka": 28.286278,
+          "conservative_i2t_a2s": 2896405.856
+        },
+        {
+          "prospective_current_ka": 29.096712,
+          "conservative_i2t_a2s": 2913994.821
+        },
+        {
+          "prospective_current_ka": 29.417266,
+          "conservative_i2t_a2s": 2920573.786
+        },
+        {
+          "prospective_current_ka": 29.741772,
+          "conservative_i2t_a2s": 2927169.42
+        },
+        {
+          "prospective_current_ka": 30.070263,
+          "conservative_i2t_a2s": 2933781.442
+        },
+        {
+          "prospective_current_ka": 30.402772,
+          "conservative_i2t_a2s": 2940409.568
+        },
+        {
+          "prospective_current_ka": 30.739333,
+          "conservative_i2t_a2s": 2947053.514
+        },
+        {
+          "prospective_current_ka": 31.079978,
+          "conservative_i2t_a2s": 2953712.991
+        },
+        {
+          "prospective_current_ka": 31.42474,
+          "conservative_i2t_a2s": 2960387.707
+        },
+        {
+          "prospective_current_ka": 31.773652,
+          "conservative_i2t_a2s": 2967077.369
+        },
+        {
+          "prospective_current_ka": 32.126746,
+          "conservative_i2t_a2s": 2973781.677
+        },
+        {
+          "prospective_current_ka": 32.484055,
+          "conservative_i2t_a2s": 2980500.333
+        },
+        {
+          "prospective_current_ka": 32.84561,
+          "conservative_i2t_a2s": 2987233.034
+        },
+        {
+          "prospective_current_ka": 33.211443,
+          "conservative_i2t_a2s": 2993979.473
+        },
+        {
+          "prospective_current_ka": 33.581585,
+          "conservative_i2t_a2s": 3000739.341
+        },
+        {
+          "prospective_current_ka": 33.956068,
+          "conservative_i2t_a2s": 3007512.326
+        },
+        {
+          "prospective_current_ka": 34.334923,
+          "conservative_i2t_a2s": 3014298.114
+        },
+        {
+          "prospective_current_ka": 34.718181,
+          "conservative_i2t_a2s": 3021096.387
+        },
+        {
+          "prospective_current_ka": 35.105871,
+          "conservative_i2t_a2s": 3027906.822
+        },
+        {
+          "prospective_current_ka": 35.498023,
+          "conservative_i2t_a2s": 3034729.097
+        },
+        {
+          "prospective_current_ka": 35.894667,
+          "conservative_i2t_a2s": 3041562.885
+        },
+        {
+          "prospective_current_ka": 36.295832,
+          "conservative_i2t_a2s": 3048407.854
+        },
+        {
+          "prospective_current_ka": 36.701547,
+          "conservative_i2t_a2s": 3055263.673
+        },
+        {
+          "prospective_current_ka": 37.11184,
+          "conservative_i2t_a2s": 3062130.004
+        },
+        {
+          "prospective_current_ka": 37.526739,
+          "conservative_i2t_a2s": 3069006.508
+        },
+        {
+          "prospective_current_ka": 37.946271,
+          "conservative_i2t_a2s": 3075892.843
+        },
+        {
+          "prospective_current_ka": 38.370463,
+          "conservative_i2t_a2s": 3082788.664
+        },
+        {
+          "prospective_current_ka": 38.799341,
+          "conservative_i2t_a2s": 3089693.621
+        },
+        {
+          "prospective_current_ka": 39.232931,
+          "conservative_i2t_a2s": 3096607.362
+        },
+        {
+          "prospective_current_ka": 39.671257,
+          "conservative_i2t_a2s": 3103529.533
+        },
+        {
+          "prospective_current_ka": 40.114346,
+          "conservative_i2t_a2s": 3110459.775
+        },
+        {
+          "prospective_current_ka": 40.562219,
+          "conservative_i2t_a2s": 3117397.728
+        },
+        {
+          "prospective_current_ka": 41.0149,
+          "conservative_i2t_a2s": 3124343.025
+        },
+        {
+          "prospective_current_ka": 41.472413,
+          "conservative_i2t_a2s": 3131295.301
+        },
+        {
+          "prospective_current_ka": 41.934778,
+          "conservative_i2t_a2s": 3138254.183
+        },
+        {
+          "prospective_current_ka": 42.402017,
+          "conservative_i2t_a2s": 3145219.298
+        },
+        {
+          "prospective_current_ka": 42.87415,
+          "conservative_i2t_a2s": 3152190.268
+        },
+        {
+          "prospective_current_ka": 43.351196,
+          "conservative_i2t_a2s": 3159166.713
+        },
+        {
+          "prospective_current_ka": 43.833174,
+          "conservative_i2t_a2s": 3166148.249
+        },
+        {
+          "prospective_current_ka": 44.320103,
+          "conservative_i2t_a2s": 3173134.489
+        },
+        {
+          "prospective_current_ka": 44.811997,
+          "conservative_i2t_a2s": 3180125.043
+        },
+        {
+          "prospective_current_ka": 45.308875,
+          "conservative_i2t_a2s": 3187119.517
+        },
+        {
+          "prospective_current_ka": 45.81075,
+          "conservative_i2t_a2s": 3194117.515
+        },
+        {
+          "prospective_current_ka": 46.317636,
+          "conservative_i2t_a2s": 3201118.637
+        },
+        {
+          "prospective_current_ka": 46.829548,
+          "conservative_i2t_a2s": 3208122.479
+        },
+        {
+          "prospective_current_ka": 47.346496,
+          "conservative_i2t_a2s": 3215128.635
+        },
+        {
+          "prospective_current_ka": 47.868491,
+          "conservative_i2t_a2s": 3222136.695
+        },
+        {
+          "prospective_current_ka": 48.395544,
+          "conservative_i2t_a2s": 3229146.247
+        },
+        {
+          "prospective_current_ka": 48.927663,
+          "conservative_i2t_a2s": 3236156.874
+        },
+        {
+          "prospective_current_ka": 49.464856,
+          "conservative_i2t_a2s": 3243168.156
+        },
+        {
+          "prospective_current_ka": 50.007128,
+          "conservative_i2t_a2s": 3250179.672
+        },
+        {
+          "prospective_current_ka": 50.554485,
+          "conservative_i2t_a2s": 3257190.994
+        },
+        {
+          "prospective_current_ka": 51.106931,
+          "conservative_i2t_a2s": 3264201.695
+        },
+        {
+          "prospective_current_ka": 51.664468,
+          "conservative_i2t_a2s": 3271211.34
+        },
+        {
+          "prospective_current_ka": 52.227097,
+          "conservative_i2t_a2s": 3278219.495
+        },
+        {
+          "prospective_current_ka": 52.794817,
+          "conservative_i2t_a2s": 3285225.72
+        },
+        {
+          "prospective_current_ka": 53.367629,
+          "conservative_i2t_a2s": 3292229.573
+        },
+        {
+          "prospective_current_ka": 53.945527,
+          "conservative_i2t_a2s": 3299230.609
+        },
+        {
+          "prospective_current_ka": 54.528508,
+          "conservative_i2t_a2s": 3306228.379
+        },
+        {
+          "prospective_current_ka": 55.116566,
+          "conservative_i2t_a2s": 3313222.431
+        },
+        {
+          "prospective_current_ka": 55.709692,
+          "conservative_i2t_a2s": 3320212.31
+        },
+        {
+          "prospective_current_ka": 56.307878,
+          "conservative_i2t_a2s": 3327197.557
+        },
+        {
+          "prospective_current_ka": 56.911113,
+          "conservative_i2t_a2s": 3334177.711
+        },
+        {
+          "prospective_current_ka": 57.519384,
+          "conservative_i2t_a2s": 3341152.306
+        },
+        {
+          "prospective_current_ka": 58.132677,
+          "conservative_i2t_a2s": 3348120.875
+        },
+        {
+          "prospective_current_ka": 58.750976,
+          "conservative_i2t_a2s": 3355082.947
+        },
+        {
+          "prospective_current_ka": 59.374263,
+          "conservative_i2t_a2s": 3362038.047
+        },
+        {
+          "prospective_current_ka": 60.002519,
+          "conservative_i2t_a2s": 3368985.697
+        },
+        {
+          "prospective_current_ka": 60.635723,
+          "conservative_i2t_a2s": 3375925.418
+        },
+        {
+          "prospective_current_ka": 61.273851,
+          "conservative_i2t_a2s": 3382856.724
+        },
+        {
+          "prospective_current_ka": 61.916878,
+          "conservative_i2t_a2s": 3389779.128
+        },
+        {
+          "prospective_current_ka": 62.564777,
+          "conservative_i2t_a2s": 3396692.142
+        },
+        {
+          "prospective_current_ka": 63.217518,
+          "conservative_i2t_a2s": 3403595.27
+        },
+        {
+          "prospective_current_ka": 63.875072,
+          "conservative_i2t_a2s": 3410488.018
+        },
+        {
+          "prospective_current_ka": 64.537404,
+          "conservative_i2t_a2s": 3417369.885
+        },
+        {
+          "prospective_current_ka": 65.204479,
+          "conservative_i2t_a2s": 3424240.369
+        },
+        {
+          "prospective_current_ka": 65.87626,
+          "conservative_i2t_a2s": 3431098.964
+        },
+        {
+          "prospective_current_ka": 66.552707,
+          "conservative_i2t_a2s": 3437945.161
+        },
+        {
+          "prospective_current_ka": 67.233779,
+          "conservative_i2t_a2s": 3444778.45
+        },
+        {
+          "prospective_current_ka": 67.919431,
+          "conservative_i2t_a2s": 3451598.315
+        },
+        {
+          "prospective_current_ka": 68.609618,
+          "conservative_i2t_a2s": 3458404.238
+        },
+        {
+          "prospective_current_ka": 69.30429,
+          "conservative_i2t_a2s": 3465195.7
+        }
+      ]
+    }
+  ]
+}

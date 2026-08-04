@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} · 电气计算台{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="/">项目</a><span>/</span><strong>{{ project.code }}</strong></nav>
+<section class="project-head">
+  <div><p class="eyebrow">{{ project.code }}</p><h1>{{ project.name }}</h1><p>{{ project.description or "未填写项目说明" }}</p></div>
+  <div class="actions">
+    <a class="button secondary" href="/quick">快速初选</a>
+    <a class="button secondary" href="/projects/{{ project.id }}/export.xlsx">导出 Excel</a>
+    <form method="post" action="/projects/{{ project.id }}/calculate-all"><button type="submit">全部复算</button></form>
+  </div>
+</section>
+
+<section class="metrics">
+  <div><span>回路</span><strong>{{ circuits|length }}</strong></div>
+  <div><span>计算记录</span><strong>{{ runs|length }}</strong></div>
+  <div><span>有效记录</span><strong>{{ runs|rejectattr('stale')|list|length }}</strong></div>
+  <div><span>待完善依据</span><strong>5</strong></div>
+</section>
+
+<div class="workspace-grid">
+  <section>
+    <div class="section-title"><div><p class="eyebrow">CIRCUITS</p><h2>回路数据</h2></div><button class="ghost" type="button" onclick="document.getElementById('circuit-form').showModal()">新增回路</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>回路</th><th>相制/电压</th><th>安装功率</th><th>长度</th><th>修订</th><th></th></tr></thead>
+        <tbody>
+        {% for circuit in circuits %}
+          <tr>
+            <td><strong>{{ circuit.code }}</strong><small>{{ circuit.name }}</small></td>
+            <td>{{ circuit.phase }}P / {{ circuit.voltage_v or "—" }} V</td>
+            <td>{{ circuit.installed_power_kw or "—" }} kW</td>
+            <td>{{ circuit.length_m or "—" }} m</td>
+            <td>R{{ circuit.revision }}</td>
+            <td class="row-actions">
+              <form method="post" action="/circuits/{{ circuit.id }}/calculate"><button class="small" type="submit">计算</button></form>
+              <button class="small ghost" type="button" onclick='editCircuit({{ circuit|tojson }})'>编辑</button>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="empty-cell">暂无回路。可新增一条，或从右侧导入 Excel。</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title history-title"><div><p class="eyebrow">HISTORY</p><h2>计算历史</h2></div></div>
+    <div class="run-list">
+      {% for run in runs %}
+      <a href="/runs/{{ run.id }}" class="run-row {% if run.stale %}stale{% endif %}">
+        <span class="status-dot status-{{ run.status }}"></span>
+        <div><strong>{{ run.circuit_code }} · {{ run.module }}</strong><small>{{ run.created_at }} · 引擎 {{ run.engine_version }}</small></div>
+        <span class="tag">{{ "已过期" if run.stale else run.status }}</span>
+        <span>→</span>
+      </a>
+      {% else %}
+      <div class="empty"><strong>还没有计算记录</strong><p>回路保存后点击“计算”，会连续生成三个模块的不可覆盖记录。</p></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="side-stack">
+    <section class="panel">
+      <p class="eyebrow">BATCH IMPORT</p><h2>批量导入</h2>
+      <p class="muted">仅在一次录入多条回路时使用。单条回路可直接新增，不需要 Excel。</p>
+      <div class="inline-actions"><a class="button secondary" href="/templates/circuits.xlsx">下载模板</a></div>
+      <form method="post" enctype="multipart/form-data" action="/projects/{{ project.id }}/import" class="stack compact">
+        <label class="file-field">选择 .xlsx<input type="file" name="file" accept=".xlsx" required></label>
+        <button type="submit">校验并导入</button>
+      </form>
+    </section>
+    <section class="panel warning-panel">
+      <p class="eyebrow">RELEASE GATE</p><h2>正式发布闸门</h2>
+      <ul>
+        <li>规范原文、条文号和页码完整</li>
+        <li>厂家参数来源已核实</li>
+        <li>至少 3 份人工样本回归通过</li>
+      </ul>
+      <a class="text-link" href="/rules">查看依据状态 →</a>
+    </section>
+  </aside>
+</div>
+
+<dialog id="circuit-form">
+  <form method="post" action="/projects/{{ project.id }}/circuits" class="dialog-form">
+    <div class="dialog-head"><div><p class="eyebrow">CIRCUIT INPUT</p><h2>回路数据</h2></div><button type="button" class="close" onclick="this.closest('dialog').close()">×</button></div>
+    <p class="form-note">没有核实来源的参数请留空。数值 0、缺失和不适用会被严格区分。</p>
+    <h3>基本信息</h3>
+    <div class="form-grid">
+      <label>回路编号*<input name="code" required></label>
+      <label>回路名称*<input name="name" required></label>
+      <label>相制*<select name="phase" required><option value="3">三相</option><option value="1">单相</option></select></label>
+      <label>电压 (V)<input name="voltage_v" type="number" step="any"></label>
+      <label>安装功率 (kW)<input name="installed_power_kw" type="number" step="any"></label>
+      <label>线路长度 (m)<input name="length_m" type="number" step="any"></label>
+    </div>
+    <details class="advanced-fields">
+      <summary>高级参数（专业人员填写）</summary>
+      <p class="form-note">不了解的参数请留空，平台会指出因此无法完成的校核，不会自动猜测。</p>
+      <h3>负荷参数</h3>
+      <div class="form-grid">
+        <label>需用系数<input name="demand_factor" type="number" step="any"></label>
+        <label>功率因数<input name="power_factor" type="number" step="any"></label>
+        <label>效率<input name="efficiency" type="number" step="any"></label>
+      </div>
+      <h3>线路与保护</h3>
+      <div class="form-grid">
+        <label>电缆规格<input name="cable_spec"></label>
+        <label>电缆载流量 (A)<input name="cable_ampacity_a" type="number" step="any"></label>
+        <label>电缆电阻 (Ω/km)<input name="cable_r_ohm_per_km" type="number" step="any"></label>
+        <label>电缆电抗 (Ω/km)<input name="cable_x_ohm_per_km" type="number" step="any"></label>
+        <label>电压降限值 (%)<input name="voltage_drop_limit_pct" type="number" step="any"></label>
+        <label>保护器件型号<input name="breaker_model"></label>
+        <label>额定电流 (A)<input name="breaker_rating_a" type="number" step="any"></label>
+        <label>分断能力 (kA)<input name="breaking_capacity_ka" type="number" step="any"></label>
+      </div>
+      <h3>短路等值阻抗（折算至回路电压侧）</h3>
+      <div class="form-grid">
+        <label>电源电阻 (Ω)<input name="source_r_ohm" type="number" step="any"></label>
+        <label>电源电抗 (Ω)<input name="source_x_ohm" type="number" step="any"></label>
+        <label>变压器电阻 (Ω)<input name="transformer_r_ohm" type="number" step="any"></label>
+        <label>变压器电抗 (Ω)<input name="transformer_x_ohm" type="number" step="any"></label>
+      </div>
+    </details>
+    <div class="dialog-actions"><button type="button" class="secondary" onclick="this.closest('dialog').close()">取消</button><button type="submit">保存回路</button></div>
+  </form>
+</dialog>
+<script>
+function editCircuit(data) {
+  const dialog = document.getElementById("circuit-form");
+  for (const [key, value] of Object.entries(data)) {
+    const input = dialog.querySelector(`[name="${key}"]`);
+    if (input) input.value = value ?? "";
+  }
+  dialog.showModal();
+}
+</script>
+{% endblock %}
