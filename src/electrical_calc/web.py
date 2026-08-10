@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from . import __version__
 from .database import DEFAULT_DB, Database
 from .catalog import (
     BUSWAY_PHASE_PE_IMPEDANCE,
@@ -43,7 +44,7 @@ from .spreadsheets import create_input_template, create_project_export, parse_ci
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 db = Database(os.environ.get("ELECTRICAL_CALC_DB", DEFAULT_DB))
-app = FastAPI(title="电气工程计算自动化平台", version="0.1.0")
+app = FastAPI(title="电气工程计算自动化平台", version=__version__)
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
