@@ -555,6 +555,17 @@ def solve_complete_circuit_combinations(
             if code not in rule_codes:
                 rule_codes.append(code)
         candidates = generated.outputs.get("candidates", [])
+        # PE最小截面只取决于电缆导体配置，不依赖后续断路器候选。
+        # 在截断候选前先排除明确不符合表54.2的规格，避免较小截面
+        # 占满搜索窗口后让本可行的后续规格永远没有机会进入组合求解。
+        candidates = [
+            candidate
+            for candidate in candidates
+            if _candidate_pe_minimum_section_check(candidate, rules).get(
+                "provisional_status"
+            )
+            != FAIL
+        ]
         if request.maximum_candidates_per_cable_segment is not None:
             candidates = candidates[: request.maximum_candidates_per_cable_segment]
         if not candidates:

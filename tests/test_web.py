@@ -142,35 +142,38 @@ def test_quick_selection_does_not_require_project_or_excel(tmp_path, monkeypatch
     assert len(web.db.list_rules()) == before_rules
 
 
-def test_complete_circuit_page_accepts_user_design_lengths_without_claiming_dwg_source(tmp_path, monkeypatch):
+def test_complete_circuit_page_builds_design_and_audit_from_engineering_inputs(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "complete-circuit.db"))
     client = TestClient(web.app)
     page = client.get("/complete-circuit")
     assert page.status_code == 200
-    assert "图纸完整回路核验" in page.text
-    assert "变压器 → 低压柜 → 分配电箱 → 用电设备" in page.text
+    assert "完整低压回路" in page.text
+    assert "单电源 · 三相 · 放射式" in page.text
+    assert 'name="task_mode"' in page.text
+    assert 'name="transformer_capacity_kva"' in page.text
+    assert 'name="upstream_short_circuit_capacity_mva"' in page.text
+    assert 'name="load_value"' in page.text
     assert 'name="length_connection"' in page.text
     assert 'name="length_feeder"' in page.text
     assert 'name="length_final"' in page.text
-    assert "不要求用户填写R/X、Zs或I²t" in page.text
+    assert 'name="existing_section_connection"' in page.text
+    assert "用户不填写专业等值参数" in page.text
 
-    response = client.post(
-        "/complete-circuit",
-        data={
-            "length_connection": "10",
-            "length_feeder": "50",
-            "length_final": "30",
-        },
-    )
+    response = client.post("/complete-circuit", data={})
     assert response.status_code == 200
-    assert "原图设计复核" in response.text
-    assert "替代设计未计入本栏结论" in response.text
-    assert "图纸电缆 C1：YJV 4×70+PE35" in response.text
-    assert "图纸断路器 QF0 250A" in response.text
-    assert "原器件结论：不通过" in response.text
-    assert "独立替代设计候选" in response.text
-    assert "不代表原图合规" in response.text
-    assert "MCCB 通用参数候选" in response.text
+    assert "系统推导的入口参数" in response.text
+    assert "50.6448 A" in response.text
+    assert "当前主方案" in response.text
+    assert "YJV-0.6/1kV" in response.text
+    assert "MCCB" in response.text
+    assert "逐节点结果" in response.text
+
+    audit = client.post("/complete-circuit", data={"task_mode": "audit"})
+    assert audit.status_code == 200
+    assert "原设计复核" in audit.text
+    assert "QF0 250A" in audit.text
+    assert "原电缆结论" in audit.text
+    assert "独立替代主方案" in audit.text
 
 
 def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters(tmp_path, monkeypatch):

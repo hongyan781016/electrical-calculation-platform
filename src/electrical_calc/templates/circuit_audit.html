@@ -1,123 +1,112 @@
 {% extends "base.html" %}
-{% block title %}完整回路核验 · 电气计算台{% endblock %}
+{% block title %}完整回路 · 电气计算台{% endblock %}
 {% block content %}
 <section class="quick-head circuit-head">
   <div>
-    <p class="eyebrow">DRAWING AUDIT · COMPLETE CIRCUIT</p>
-    <h1>图纸完整回路核验</h1>
-    <p>图纸是既有设计条件。系统先按原电缆和原断路器复算，再把替代候选单独列出；两种结论互不替代。</p>
+    <p class="eyebrow">COMPLETE RADIAL CIRCUIT · V0.3</p>
+    <h1>完整低压回路</h1>
+    <p>从变压器低压出口到用电设备末端，只填写工程已知条件。R/X、累计阻抗、短路电流和故障电流由系统推导。</p>
   </div>
-  <aside class="quick-badge"><span>匿名验收链</span><strong>变压器 → 低压柜 → 分配电箱 → 用电设备</strong><small>上级系统100MVA；其余固定条件均标记为测试夹具</small></aside>
+  <aside class="quick-badge"><span>当前边界</span><strong>单电源 · 三相 · 放射式</strong><small>新设计求主方案；既有核验评价原电缆和原断路器</small></aside>
 </section>
 
-{% if errors %}
-<div class="alert danger"><strong>不能计算</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
-{% endif %}
+{% if errors %}<div class="alert danger"><strong>不能计算</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
 
-<form method="post" action="/complete-circuit" class="panel stack">
-  <div><p class="eyebrow">DRAWING CONDITIONS</p><h2>图纸线路长度</h2><p class="muted">本页只开放图纸常见的长度条件。变压器、负荷、电缆和断路器规格来自匿名测试夹具，不要求用户填写R/X、Zs或I²t。</p></div>
-  <div class="wizard-grid three">
-    {% for segment_id, label in segment_labels.items() %}
-    <label>{{ label }}（m）
-      <input name="length_{{ segment_id }}" type="number" min="0.01" step="0.01" required value="{{ lengths[segment_id] }}">
-    </label>
-    {% endfor %}
-  </div>
-  <button type="submit">复算原设计并生成独立替代候选</button>
+<form method="post" action="/complete-circuit" class="circuit-wizard">
+  <section class="panel wizard-section">
+    <div class="wizard-index">01</div><div><p class="eyebrow">TASK</p><h2>选择任务</h2></div>
+    <div class="wizard-grid three">
+      <label>计算任务<select name="task_mode" id="circuit-task-mode"><option value="design" {% if form.task_mode == 'design' %}selected{% endif %}>快速设计：求主方案</option><option value="audit" {% if form.task_mode == 'audit' %}selected{% endif %}>既有设计：核验原部件</option></select></label>
+      <label>回路编号<input name="circuit_code" required value="{{ form.circuit_code }}"></label>
+      <label>回路名称<input name="circuit_name" required value="{{ form.circuit_name }}"></label>
+    </div>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-index">02</div><div><p class="eyebrow">POWER SOURCE</p><h2>电源条件</h2></div>
+    <div class="wizard-grid four">
+      <label>变压器系列<select name="transformer_family"><option value="scb11" {% if form.transformer_family == 'scb11' %}selected{% endif %}>SCB11干式变压器</option><option value="s11_m" {% if form.transformer_family == 's11_m' %}selected{% endif %}>S11-M油浸式变压器</option></select></label>
+      <label>容量（kVA）<select name="transformer_capacity_kva">{% for value in transformer_capacities %}<option value="{{ value|int }}" {% if form.transformer_capacity_kva|float == value %}selected{% endif %}>{{ value|int }}</option>{% endfor %}</select></label>
+      <label>铭牌 uk（%）<input name="transformer_uk_percent" type="number" min="0.1" step="0.1" required value="{{ form.transformer_uk_percent }}"></label>
+      <label>上级系统短路容量（MVA）<input name="upstream_short_circuit_capacity_mva" type="number" min="0.1" step="0.1" required value="{{ form.upstream_short_circuit_capacity_mva }}"><small>不知道时采用100MVA参考工况</small></label>
+    </div>
+    <p class="basis-note">系统自动将上级短路容量折算为R/X，并从已核实表格取得变压器正序和相—PE阻抗；用户不填写专业等值参数。</p>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-index">03</div><div><p class="eyebrow">TERMINAL LOAD</p><h2>末端负荷</h2></div>
+    <div class="wizard-grid four">
+      <label>负荷类型<select name="load_kind"><option value="ordinary" {% if form.load_kind == 'ordinary' %}selected{% endif %}>普通三相负荷</option><option value="motor" {% if form.load_kind == 'motor' %}selected{% endif %}>4极直接启动电动机</option></select></label>
+      <label>已知量<select name="load_basis"><option value="kw" {% if form.load_basis == 'kw' %}selected{% endif %}>有功功率 kW</option><option value="kva" {% if form.load_basis == 'kva' %}selected{% endif %}>视在功率 kVA</option><option value="a" {% if form.load_basis == 'a' %}selected{% endif %}>已知电流 A</option></select></label>
+      <label>功率或电流数值<input name="load_value" type="number" min="0.01" step="0.01" required value="{{ form.load_value }}"></label>
+      <label>功率因数<input name="power_factor" type="number" min="0.01" max="1" step="0.01" required value="{{ form.power_factor }}"><small>电动机精确目录行会自动替换此参考值</small></label>
+    </div>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-index">04</div><div><p class="eyebrow">FEEDERS</p><h2>逐段线路</h2><p class="muted">槽盒按40℃、1层1根；埋地按土壤热阻1.0 K·m/W、单回路、间距0.25m、深度0.7m的参考工况计算。</p></div>
+    <div class="selection-grid">
+      {% for segment_id, label in segment_labels.items() %}
+      <article class="selection-card">
+        <h3>{{ label }}</h3>
+        <label>长度（m）<input name="length_{{ segment_id }}" type="number" min="0.01" step="0.01" required value="{{ form['length_' + segment_id] }}"></label>
+        <label>YJV电缆结构<select name="configuration_{{ segment_id }}"><option value="yjv_3c_3ph_pe" {% if form['configuration_' + segment_id] == 'yjv_3c_3ph_pe' %}selected{% endif %}>三芯＋独立PE</option><option value="yjv_4c_3ph_n_pe" {% if form['configuration_' + segment_id] == 'yjv_4c_3ph_n_pe' %}selected{% endif %}>四芯（3相＋PE）</option><option value="yjv_5c_3ph_n_pe" {% if form['configuration_' + segment_id] == 'yjv_5c_3ph_n_pe' %}selected{% endif %}>五芯（3相＋N＋PE）</option></select></label>
+        <label>敷设方式<select name="scenario_{{ segment_id }}"><option value="tray" {% if form['scenario_' + segment_id] == 'tray' %}selected{% endif %}>槽盒</option><option value="direct_buried" {% if form['scenario_' + segment_id] == 'direct_buried' %}selected{% endif %}>埋地管槽</option></select></label>
+        <label>环境温度（℃）<input name="temperature_{{ segment_id }}" type="number" step="1" required value="{{ form['temperature_' + segment_id] }}"></label>
+        <div class="audit-fields" {% if form.task_mode != 'audit' %}hidden{% endif %}>
+          <hr><strong>原设计参数</strong>
+          <label>原电缆相线截面（mm²）<input name="existing_section_{{ segment_id }}" type="number" min="1" step="0.1" value="{{ form['existing_section_' + segment_id] }}"></label>
+          <label>断路器标识<input name="breaker_designation_{{ segment_id }}" value="{{ form['breaker_designation_' + segment_id] }}"></label>
+          <div class="wizard-grid two">
+            <label>In（A）<input name="breaker_in_{{ segment_id }}" type="number" min="0.1" step="0.1" value="{{ form['breaker_in_' + segment_id] }}"></label>
+            <label>壳架（A）<input name="breaker_frame_{{ segment_id }}" type="number" min="0.1" step="0.1" value="{{ form['breaker_frame_' + segment_id] }}"></label>
+            <label>Ue（V）<input name="breaker_voltage_{{ segment_id }}" type="number" min="1" step="1" value="{{ form['breaker_voltage_' + segment_id] }}"></label>
+            <label>Icu（kA）<input name="breaker_icu_{{ segment_id }}" type="number" min="0.1" step="0.1" value="{{ form['breaker_icu_' + segment_id] }}"></label>
+          </div>
+          <label>保证动作电流（A，可不填）<input name="breaker_action_{{ segment_id }}" type="number" min="0.1" step="0.1" value="{{ form['breaker_action_' + segment_id] }}"><small>没有实物曲线时留空，自动切断结论保持无法判断</small></label>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-index">05</div><div><p class="eyebrow">LIMIT</p><h2>统一校核条件</h2></div>
+    <div class="wizard-grid two"><label>允许累计电压降（%）<input name="voltage_drop_limit_percent" type="number" min="0.1" step="0.1" required value="{{ form.voltage_drop_limit_percent }}"></label><div class="basis-note"><strong>本次自动完成：</strong>负荷流、载流量及修正、累计压降、节点短路、TN接地故障、相线/PE热稳定、分断能力和自动切断条件。</div></div>
+  </section>
+  <button type="submit">计算完整回路</button>
 </form>
 
-{% if audit_result %}
-{% set audit = audit_result.outputs %}
-<section class="panel candidate-panel">
-  <div class="section-title">
-    <div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原图设计复核</h2></div>
-    <span class="status-pill {% if audit_result.provisional_status == '通过' %}pass{% elif audit_result.provisional_status == '不通过' %}fail{% else %}pending{% endif %}">{{ audit_result.provisional_status }}</span>
-  </div>
-  <p class="basis-note"><strong>核验对象：</strong>图纸原部件。替代设计未计入本栏结论。</p>
+<script>(() => { const mode = document.getElementById('circuit-task-mode'); const sync = () => document.querySelectorAll('.audit-fields').forEach(el => el.hidden = mode.value !== 'audit'); mode?.addEventListener('change', sync); sync(); })();</script>
 
-  <h3>逐节点计算</h3>
-  <div class="selection-grid">
-    {% for node in audit.chain_result.outputs.node_results %}
-    <article class="selection-card">
-      <h3>{{ node.node_name }}</h3>
-      <p>累计压降：{{ node.cumulative_voltage_drop_v|round(4) }} V / {{ node.cumulative_voltage_drop_percent|round(4) }}%</p>
-      <p>最大三相短路：{% if node.three_phase_short_circuit_ka is not none %}{{ node.three_phase_short_circuit_ka|round(4) }} kA{% else %}不适用{% endif %}</p>
-      <p>最小相—N短路：{% if node.phase_neutral_short_circuit_a is not none %}{{ node.phase_neutral_short_circuit_a|round(2) }} A{% else %}不适用（本段未配置N）{% endif %}</p>
-      <p>最小相—PE故障：{% if node.earth_fault_current_a is not none %}{{ node.earth_fault_current_a|round(2) }} A{% else %}无法判断{% endif %}</p>
-    </article>
-    {% endfor %}
-  </div>
+{% if derived %}
+<section class="quick-output">
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">DERIVED INPUT</p><h2>系统推导的入口参数</h2></div><span class="status-pill pass">无需重复输入</span></div>
+    <div class="summary-grid"><div><span>末端计算电流</span><strong>{{ derived.design_current_a|round(4) }} A</strong></div><div><span>采用功率因数</span><strong>{{ derived.power_factor }}</strong></div><div><span>上级参考容量</span><strong>{{ derived.upstream_reference_capacity_mva }} MVA</strong></div><div><span>累计R/X与故障电流</span><strong>由线路表自动推导</strong></div></div>
+    {% if notices %}<ul class="muted">{% for notice in notices %}<li>{{ notice }}</li>{% endfor %}</ul>{% endif %}
+  </section>
 
-  <h3>原图电缆</h3>
-  <div class="selection-grid">
-    {% for cable in audit.installed_cables %}
-    <article class="selection-card">
-      <h3>{{ cable.designation }}</h3>
-      <p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p>
-      <p>载流量核验：<strong>{{ cable.ampacity_status }}</strong></p>
-      <p>PE {{ cable.protective_section_mm2 }} mm²；最小截面核验：<strong>{{ cable.pe_minimum_section.provisional_status }}</strong></p>
-    </article>
-    {% endfor %}
-  </div>
+  {% if audit_result %}{% set audit = audit_result.outputs %}
+  <section class="panel candidate-panel">
+    <div class="section-title"><div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原设计复核</h2></div><span class="status-pill {% if audit_result.provisional_status == '通过' %}pass{% elif audit_result.provisional_status == '不通过' %}fail{% else %}pending{% endif %}">{{ audit_result.provisional_status }}</span></div>
+    <p class="basis-note">本栏只评价用户填写的原电缆和原断路器，替代候选不会改变原设计结论。</p>
+    {% if audit.installed_cables %}<div class="selection-grid">{% for cable in audit.installed_cables %}<article class="selection-card"><h3>{{ segment_labels[cable.segment_id] }}</h3><p>{{ cable.designation }}</p>{% if cable.corrected_ampacity_a is defined %}<p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p><p>原电缆结论：<strong>{{ cable.status }}</strong></p>{% else %}<p>{{ cable.reason }}</p>{% endif %}</article>{% endfor %}</div>{% endif %}
+    {% if audit.installed_breakers %}<div class="selection-grid">{% for breaker in audit.installed_breakers %}<article class="selection-card"><h3>{{ breaker.designation }}</h3><p>负荷：{{ breaker.checks.load_current.status }}；电缆配合：{{ breaker.checks.cable_coordination.status }}</p><p>分断能力：{{ breaker.checks.breaking_capacity.status }}；自动切断：{{ breaker.checks.automatic_disconnection.status }}</p><p>原断路器结论：<strong>{{ breaker.status }}</strong></p></article>{% endfor %}</div>{% endif %}
+    {% if audit_result.warnings %}<div class="alert warning"><ul>{% for item in audit_result.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
+  {% endif %}
 
-  <h3>原图断路器</h3>
-  <div class="selection-grid">
-    {% for breaker in audit.installed_breakers %}
-    <article class="selection-card">
-      <h3>{{ breaker.designation }}</h3>
-      <p>负荷电流：{{ breaker.checks.load_current.status }}（{{ breaker.checks.load_current.criterion or breaker.checks.load_current.reason }}）</p>
-      <p>电缆配合：{{ breaker.checks.cable_coordination.status }}（{{ breaker.checks.cable_coordination.criterion or breaker.checks.cable_coordination.reason }}）</p>
-      <p>分断能力：{{ breaker.checks.breaking_capacity.status }}（{{ breaker.checks.breaking_capacity.criterion or breaker.checks.breaking_capacity.reason }}）</p>
-      <p>自动切断：{{ breaker.checks.automatic_disconnection.status }}（{{ breaker.checks.automatic_disconnection.criterion or breaker.checks.automatic_disconnection.reason }}）</p>
-      <p>相导体热稳定：{{ breaker.checks.phase_thermal.status }}；允许最长切除时间 {{ breaker.checks.phase_thermal.maximum_permitted_clearing_time_s }} s</p>
-      <p>PE热稳定：{{ breaker.checks.pe_thermal.status }}；允许最大I²t {{ breaker.checks.pe_thermal.maximum_permitted_let_through_energy_a2s }} A²·s</p>
-      <p><strong>原器件结论：{{ breaker.status }}</strong></p>
-    </article>
-    {% endfor %}
-  </div>
-  <h3>上下级保护配合</h3>
-  <div class="selection-grid">
-    {% for item in audit.protection_coordination %}
-    <article class="selection-card">
-      <h3>{{ item.upstream_designation }} → {{ item.downstream_designation }}</h3>
-      <p>选择性/后备保护：<strong>{{ item.status }}</strong></p>
-      <p>{{ item.reason }}</p>
-    </article>
-    {% endfor %}
-  </div>
-  <p class="basis-note">末端累计电压降 {{ audit.voltage_drop_check.actual_percent|round(4) }}%，限值 {{ audit.voltage_drop_check.limit_percent }}%：{{ audit.voltage_drop_check.status }}。</p>
-</section>
-
-{% set alternatives = alternative_result.outputs.viable_combinations + alternative_result.outputs.incomplete_combinations %}
-<section class="panel candidate-panel">
-  <div class="section-title">
-    <div><p class="eyebrow">ALTERNATIVE DESIGN</p><h2>独立替代设计候选</h2></div>
-    <span class="status-pill pending">不代表原图合规</span>
-  </div>
-  {% if alternatives %}
-  {% set choice = alternatives[0] %}
-  <div class="selection-grid">
-    {% for cable in choice.cables %}
-    <article class="selection-card">
-      <h3>{{ segment_labels[cable.candidate_id.split(':')[0]] }}</h3>
-      <p>{{ cable.cable_specification }}</p>
-      <p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p>
-    </article>
-    {% endfor %}
-  </div>
-  <div class="selection-grid">
-    {% for breaker in choice.breakers %}
-    <article class="selection-card">
-      <h3>{{ breaker.family }} 通用参数候选</h3>
-      <p>壳架 {{ breaker.frame_current_a }} A；In {{ breaker.rated_current_a }} A；Ue {{ breaker.rated_voltage_v }} V</p>
-      <p>Icu {{ breaker.selected_icu_ka }} kA；采用极数 {{ breaker.adopted_poles }}</p>
-      <p>候选状态：{{ breaker.provisional_status }}</p>
-    </article>
-    {% endfor %}
-  </div>
-  {% if choice.missing_items %}<div class="alert warning"><strong>替代候选仍未闭合</strong><ul>{% for item in choice.missing_items %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
-  {% else %}
-  <div class="alert warning"><strong>没有可继续的替代组合</strong><p>{{ alternative_result.warnings|join('；') }}</p></div>
+  {% if alternative_result %}{% set viable = alternative_result.outputs.viable_combinations or [] %}{% set incomplete = alternative_result.outputs.incomplete_combinations or [] %}{% set choices = viable if viable else incomplete %}
+  <section class="panel candidate-panel">
+    <div class="section-title"><div><p class="eyebrow">PRIMARY DESIGN</p><h2>{% if audit_result %}独立替代主方案{% else %}当前主方案{% endif %}</h2></div><span class="status-pill {% if viable %}pass{% else %}pending{% endif %}">{{ alternative_result.provisional_status }}</span></div>
+    {% if choices %}{% set choice = choices[0] %}
+      <h3>电缆</h3><div class="selection-grid">{% for cable in choice.cables %}<article class="selection-card"><h3>{{ segment_labels[cable.candidate_id.split(':')[0]] }}</h3><p>{{ cable.cable_specification }}</p><p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p></article>{% endfor %}</div>
+      <h3>断路器通用参数</h3><div class="selection-grid">{% for breaker in choice.breakers %}<article class="selection-card"><h3>{{ breaker.family }} · {{ breaker.rated_current_a }}A</h3><p>壳架 {{ breaker.frame_current_a }}A；Ue {{ breaker.rated_voltage_v }}V；Icu {{ breaker.selected_icu_ka }}kA</p><p>候选状态：{{ breaker.provisional_status }}</p></article>{% endfor %}</div>
+      {% if choice.chain_result and choice.chain_result.outputs.node_results %}<h3>逐节点结果</h3><div class="selection-grid">{% for node in choice.chain_result.outputs.node_results %}<article class="selection-card"><h3>{{ node.node_name }}</h3><p>累计压降 {{ node.cumulative_voltage_drop_percent|round(4) }}%</p><p>最大三相短路 {% if node.three_phase_short_circuit_ka is not none %}{{ node.three_phase_short_circuit_ka|round(4) }}kA{% else %}—{% endif %}</p><p>最小相—PE故障 {% if node.earth_fault_current_a is not none %}{{ node.earth_fault_current_a|round(2) }}A{% else %}无法判断{% endif %}</p></article>{% endfor %}</div>{% endif %}
+      {% if choice.missing_items %}<div class="alert warning"><strong>仍需闭合</strong><ul>{% for item in choice.missing_items %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+    {% else %}<div class="alert warning"><strong>没有形成主方案</strong><ul>{% for item in alternative_result.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
   {% endif %}
 </section>
 {% endif %}
