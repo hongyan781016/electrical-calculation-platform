@@ -59,8 +59,16 @@ from .product_protection import (
     select_easypact_cvs_reference,
 )
 from .drawing_audit import audit_drawing_complete_circuit
+from .network_input import (
+    CircuitNetworkInput,
+    CircuitTaskMode,
+    ExistingBreakerInput,
+    FeederSegmentInput,
+    TerminalLoadKind,
+    build_circuit_network_requests,
+)
+from .complete_circuit import InputBasis
 from .radial_circuit_service import calculate_radial_complete_circuit
-from .validation_fixture import SEGMENT_LABELS, build_validation_fixture_requests
 from .reports import create_run_pdf
 from .spreadsheets import create_input_template, create_project_export, parse_circuit_workbook
 
@@ -575,15 +583,19 @@ def _derive_nominal_line_to_earth_voltage(
 
 @app.get("/complete-circuit", response_class=HTMLResponse)
 def complete_circuit_page(request: Request):
+    form = _complete_circuit_form_defaults()
     return templates.TemplateResponse(
         request=request,
         name="circuit_audit.html",
         context={
-            "lengths": {"connection": "10", "feeder": "50", "final": "30"},
-            "segment_labels": SEGMENT_LABELS,
+            "form": form,
+            "segment_labels": _ENGINEERING_SEGMENT_LABELS,
             "errors": [],
+            "notices": [],
+            "derived": None,
             "audit_result": None,
             "alternative_result": None,
+            "transformer_capacities": _engineering_transformer_capacities(),
         },
     )
 
@@ -591,37 +603,197 @@ def complete_circuit_page(request: Request):
 @app.post("/complete-circuit", response_class=HTMLResponse)
 async def complete_circuit_preview(request: Request):
     submitted = await request.form()
-    length_values: dict[str, str] = {}
+    form = {
+        key: str(submitted.get(key, default)).strip()
+        for key, default in _complete_circuit_form_defaults().items()
+    }
     errors: list[str] = []
-    for segment_id, label in SEGMENT_LABELS.items():
-        raw_value = str(submitted.get(f"length_{segment_id}", "")).strip()
-        length_values[segment_id] = raw_value
-        if not _positive_number(raw_value):
-            errors.append(f"{label}长度必须填写大于0的数值。")
+
+    def number(field: str, label: str, *, optional: bool = False) -> float | None:
+        raw = form[field]
+        if optional and not raw:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            errors.append(f"{label}必须填写数值。")
+            return None
+
+    transformer_capacity = number("transformer_capacity_kva", "变压器容量")
+    transformer_uk = number("transformer_uk_percent", "变压器uk%")
+    upstream_capacity = number(
+        "upstream_short_circuit_capacity_mva", "上级系统短路容量"
+    )
+    load_value = number("load_value", "负荷已知量")
+    power_factor = number("power_factor", "功率因数")
+    voltage_drop_limit = number("voltage_drop_limit_percent", "允许电压降")
+    segments: list[FeederSegmentInput] = []
+    for segment_id, label in _ENGINEERING_SEGMENT_LABELS.items():
+        length = number(f"length_{segment_id}", f"{label}长度")
+        temperature = number(f"temperature_{segment_id}", f"{label}环境温度")
+        existing_section = number(
+            f"existing_section_{segment_id}",
+            f"{label}原电缆截面",
+            optional=True,
+        )
+        breaker = None
+        if form["task_mode"] == CircuitTaskMode.AUDIT.value:
+            breaker = ExistingBreakerInput(
+                designation=form[f"breaker_designation_{segment_id}"],
+                rated_current_a=number(
+                    f"breaker_in_{segment_id}", f"{label}断路器In", optional=True
+                ),
+                frame_current_a=number(
+                    f"breaker_frame_{segment_id}",
+                    f"{label}断路器壳架电流",
+                    optional=True,
+                ),
+                rated_voltage_v=number(
+                    f"breaker_voltage_{segment_id}",
+                    f"{label}断路器额定电压",
+                    optional=True,
+                ),
+                breaking_capacity_ka=number(
+                    f"breaker_icu_{segment_id}",
+                    f"{label}断路器分断能力",
+                    optional=True,
+                ),
+                guaranteed_action_current_a=number(
+                    f"breaker_action_{segment_id}",
+                    f"{label}断路器保证动作电流",
+                    optional=True,
+                ),
+            )
+        if length is not None and temperature is not None:
+            segments.append(
+                FeederSegmentInput(
+                    id=segment_id,
+                    label=label,
+                    length_m=length,
+                    configuration_code=form[f"configuration_{segment_id}"],
+                    installation_scenario=form[f"scenario_{segment_id}"],
+                    temperature_c=temperature,
+                    existing_phase_section_mm2=existing_section,
+                    existing_breaker=breaker,
+                )
+            )
+
+    build_result = None
+    required_numbers = (
+        transformer_capacity,
+        transformer_uk,
+        upstream_capacity,
+        load_value,
+        power_factor,
+        voltage_drop_limit,
+    )
+    if not errors and all(value is not None for value in required_numbers):
+        try:
+            network_input = CircuitNetworkInput(
+                task_mode=CircuitTaskMode(form["task_mode"]),
+                circuit_code=form["circuit_code"],
+                circuit_name=form["circuit_name"],
+                transformer_family=form["transformer_family"],
+                transformer_capacity_kva=float(transformer_capacity),
+                transformer_uk_percent=float(transformer_uk),
+                upstream_short_circuit_capacity_mva=float(upstream_capacity),
+                load_kind=TerminalLoadKind(form["load_kind"]),
+                load_basis=InputBasis(form["load_basis"]),
+                load_value=float(load_value),
+                power_factor=float(power_factor),
+                voltage_drop_limit_percent=float(voltage_drop_limit),
+                segments=tuple(segments),
+            )
+        except ValueError:
+            errors.append("任务类型、负荷类型或已知量类型无效。")
+        else:
+            rules = {item["code"]: item for item in db.list_rules()}
+            build_result = build_circuit_network_requests(network_input, rules)
+            errors.extend(build_result.errors)
     context = {
-        "lengths": length_values,
-        "segment_labels": SEGMENT_LABELS,
+        "form": form,
+        "segment_labels": _ENGINEERING_SEGMENT_LABELS,
         "errors": errors,
+        "notices": list(build_result.notices) if build_result else [],
+        "derived": build_result.derived if build_result else None,
         "audit_result": None,
         "alternative_result": None,
+        "transformer_capacities": _engineering_transformer_capacities(),
     }
-    if not errors:
-        radial, audit_request = build_validation_fixture_requests(
-            {key: float(value) for key, value in length_values.items()}
-        )
+    if not errors and build_result and build_result.radial_request:
         rules = {item["code"]: item for item in db.list_rules()}
-        context["audit_result"] = audit_drawing_complete_circuit(
-            audit_request,
-            rules,
-        ).to_dict()
+        if build_result.audit_request is not None:
+            context["audit_result"] = audit_drawing_complete_circuit(
+                build_result.audit_request,
+                rules,
+            ).to_dict()
         context["alternative_result"] = calculate_radial_complete_circuit(
-            radial,
+            build_result.radial_request,
             rules,
         ).to_dict()
     return templates.TemplateResponse(
         request=request,
         name="circuit_audit.html",
         context=context,
+    )
+
+
+_ENGINEERING_SEGMENT_LABELS = {
+    "connection": "变压器低压出口 → 低压馈线柜",
+    "feeder": "低压馈线柜 → 下级配电箱",
+    "final": "下级配电箱 → 用电设备末端",
+}
+
+
+def _complete_circuit_form_defaults() -> dict[str, str]:
+    form = {
+        "task_mode": "design",
+        "circuit_code": "C-001",
+        "circuit_name": "完整低压放射式回路",
+        "transformer_family": "scb11",
+        "transformer_capacity_kva": "1000",
+        "transformer_uk_percent": "6",
+        "upstream_short_circuit_capacity_mva": "100",
+        "load_kind": "ordinary",
+        "load_basis": "kw",
+        "load_value": "30",
+        "power_factor": "0.9",
+        "voltage_drop_limit_percent": "5",
+    }
+    installed_sections = {"connection": "70", "feeder": "35", "final": "25"}
+    breaker_defaults = {
+        "connection": ("QF0 250A", "250", "400", "400", "35"),
+        "feeder": ("QF1 160A", "160", "250", "400", "35"),
+        "final": ("QF2 63A", "63", "100", "400", "25"),
+    }
+    lengths = {"connection": "10", "feeder": "50", "final": "30"}
+    for segment_id in _ENGINEERING_SEGMENT_LABELS:
+        designation, rated, frame, voltage, icu = breaker_defaults[segment_id]
+        form.update(
+            {
+                f"length_{segment_id}": lengths[segment_id],
+                f"configuration_{segment_id}": "yjv_4c_3ph_n_pe",
+                f"scenario_{segment_id}": "tray",
+                f"temperature_{segment_id}": "40",
+                f"existing_section_{segment_id}": installed_sections[segment_id],
+                f"breaker_designation_{segment_id}": designation,
+                f"breaker_in_{segment_id}": rated,
+                f"breaker_frame_{segment_id}": frame,
+                f"breaker_voltage_{segment_id}": voltage,
+                f"breaker_icu_{segment_id}": icu,
+                f"breaker_action_{segment_id}": "",
+            }
+        )
+    return form
+
+
+def _engineering_transformer_capacities() -> list[float]:
+    return sorted(
+        {
+            float(capacity)
+            for series in TRANSFORMER_PHASE_PE_IMPEDANCE["series"].values()
+            for capacity in series["rows"]
+        }
     )
 
 
