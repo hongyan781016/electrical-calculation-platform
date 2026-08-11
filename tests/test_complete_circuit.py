@@ -141,7 +141,7 @@ def test_distribution_feeder_can_supply_lighting_or_mixed_loads():
         )
 
 
-def test_motor_is_representable_but_outside_v1_calculation_scope():
+def test_three_phase_motor_rated_output_power_is_valid_for_v02_running_chain():
     circuit = valid_circuit(
         load=Load(
             input_basis=InputBasis.ACTIVE_POWER_KW,
@@ -156,8 +156,26 @@ def test_motor_is_representable_but_outside_v1_calculation_scope():
         )
     )
     issues = circuit.validate()
-    motor_issue = next(item for item in issues if item.code == "scope.motor_not_implemented")
-    assert motor_issue.severity == "unsupported"
+    assert not issues
+
+
+def test_motor_power_input_requires_efficiency_and_three_phase():
+    circuit = valid_circuit(
+        load=Load(
+            input_basis=InputBasis.ACTIVE_POWER_KW,
+            input_value=15,
+            phase=Phase.SINGLE,
+            circuit_application=CircuitApplication.MOTOR_FINAL,
+            load_profile=LoadProfile.MOTOR,
+            duty_characteristic=DutyCharacteristic.HIGH_INRUSH,
+            power_definition=PowerDefinition.CALCULATED,
+            power_factor=0.85,
+        )
+    )
+
+    issue_codes = {item.code for item in circuit.validate()}
+    assert "motor.phase_not_supported" in issue_codes
+    assert "motor.efficiency_required" in issue_codes
 
 
 def test_installed_kw_requires_demand_factor_and_power_factor_source():

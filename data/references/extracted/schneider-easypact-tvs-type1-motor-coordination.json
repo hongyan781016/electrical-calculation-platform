@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "catalog_code": "SCHNEIDER.EASYPACT.CVS_TVS.TYPE1.380_415V.2025",
+  "manufacturer": "Schneider Electric",
+  "coordination_type": 1,
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "document": "data/references/raw/product-reference/official-web/Schneider_EasyPact_Selectivity_LVPED221010EN_2025.pdf",
+    "title": "EasyPact System Selectivity, Cascading and Coordination Guide",
+    "reference": "PDF第38页，印刷页C-5",
+    "table": "Type 1 Coordination (IEC/EN 60947-4-1), 380–415 V AC"
+  },
+  "conditions": {
+    "system_voltage_min_v": 380,
+    "system_voltage_max_v": 415,
+    "starter_type": "direct_on_line",
+    "trip_unit": "MA magnetic-only",
+    "overload_protection": "independent thermal overload relay"
+  },
+  "rows": [
+    {"power_kw":0.37,"motor_current_380_a":1.2,"motor_current_415_a":1.1,"maximum_operational_current_a":1.6,"breaker":"CVS100-MA","ma_rating_a":2.5,"magnetic_setting_multiple":[6,13],"magnetic_setting_a":22.5,"contactor":"LC1E06","overload_relay":"LRE06","overload_range_a":[1,1.6]},
+    {"power_kw":0.55,"motor_current_380_a":1.6,"motor_current_415_a":1.5,"maximum_operational_current_a":1.6,"breaker":"CVS100-MA","ma_rating_a":2.5,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":32.5,"contactor":"LC1E06","overload_relay":"LRE06","overload_range_a":[1,1.6]},
+    {"power_kw":0.75,"motor_current_380_a":2,"motor_current_415_a":1.8,"maximum_operational_current_a":2.5,"breaker":"CVS100-MA","ma_rating_a":2.5,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":32.5,"contactor":"LC1E06","overload_relay":"LRE07","overload_range_a":[1.6,2.5]},
+    {"power_kw":1.1,"motor_current_380_a":2.8,"motor_current_415_a":2.6,"maximum_operational_current_a":4,"breaker":"CVS100-MA","ma_rating_a":6.3,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":57,"contactor":"LC1E06","overload_relay":"LRE08","overload_range_a":[2.5,4]},
+    {"power_kw":1.5,"motor_current_380_a":3.7,"motor_current_415_a":3.4,"maximum_operational_current_a":4,"breaker":"CVS100-MA","ma_rating_a":6.3,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":57,"contactor":"LC1E06","overload_relay":"LRE08","overload_range_a":[2.5,4]},
+    {"power_kw":2.2,"motor_current_380_a":5.3,"motor_current_415_a":4.8,"maximum_operational_current_a":6,"breaker":"CVS100-MA","ma_rating_a":6.3,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":82,"contactor":"LC1E06","overload_relay":"LRE10","overload_range_a":[4,6]},
+    {"power_kw":3,"motor_current_380_a":7,"motor_current_415_a":6.5,"maximum_operational_current_a":8,"breaker":"CVS100-MA","ma_rating_a":12.5,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":113,"contactor":"LC1E09","overload_relay":"LRE12","overload_range_a":[5.5,8]},
+    {"power_kw":4,"motor_current_380_a":9,"motor_current_415_a":8.2,"maximum_operational_current_a":10,"breaker":"CVS100-MA","ma_rating_a":12.5,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":138,"contactor":"LC1E09","overload_relay":"LRE14","overload_range_a":[7,10]},
+    {"power_kw":5.5,"motor_current_380_a":12,"motor_current_415_a":11,"maximum_operational_current_a":12.5,"breaker":"CVS100-MA","ma_rating_a":12.5,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":163,"contactor":"LC1E12","overload_relay":"LRE16","overload_range_a":[9,13]},
+    {"power_kw":7.5,"motor_current_380_a":16,"motor_current_415_a":14,"maximum_operational_current_a":18,"breaker":"CVS100-MA","ma_rating_a":25,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":250,"contactor":"LC1E18","overload_relay":"LRE21","overload_range_a":[16,24]},
+    {"power_kw":11,"motor_current_380_a":23,"motor_current_415_a":21,"maximum_operational_current_a":25,"breaker":"CVS100-MA","ma_rating_a":25,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":325,"contactor":"LC1E25","overload_relay":"LRE22","overload_range_a":[16,24]},
+    {"power_kw":15,"motor_current_380_a":30,"motor_current_415_a":28,"maximum_operational_current_a":32,"breaker":"CVS100-MA","ma_rating_a":50,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":450,"contactor":"LC1E32","overload_relay":"LRE32","overload_range_a":[23,32]},
+    {"power_kw":18.5,"motor_current_380_a":37,"motor_current_415_a":34,"maximum_operational_current_a":40,"breaker":"CVS100-MA","ma_rating_a":50,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":550,"contactor":"LC1E40","overload_relay":"LRE355","overload_range_a":[30,40]},
+    {"power_kw":22,"motor_current_380_a":43,"motor_current_415_a":40,"maximum_operational_current_a":50,"breaker":"CVS100-MA","ma_rating_a":50,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":650,"contactor":"LC1E50","overload_relay":"LRE357","overload_range_a":[37,50]},
+    {"power_kw":30,"motor_current_380_a":59,"motor_current_415_a":55,"maximum_operational_current_a":63,"breaker":"CVS100-MA","ma_rating_a":100,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":900,"contactor":"LC1E65","overload_relay":"LRE359","overload_range_a":[48,65]},
+    {"power_kw":37,"motor_current_380_a":72,"motor_current_415_a":66,"maximum_operational_current_a":100,"breaker":"CVS100-MA","ma_rating_a":100,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":1100,"contactor":"LC1E80","overload_relay":"LRE363","overload_range_a":[63,80]},
+    {"power_kw":45,"motor_current_380_a":85,"motor_current_415_a":80,"maximum_operational_current_a":100,"breaker":"CVS100-MA","ma_rating_a":100,"magnetic_setting_multiple":[6,14],"magnetic_setting_a":1300,"contactor":"LC1E95","overload_relay":"LRE481","overload_range_a":[62,99]},
+    {"power_kw":55,"motor_current_380_a":105,"motor_current_415_a":100,"maximum_operational_current_a":135,"breaker":"CVS160-MA","ma_rating_a":150,"magnetic_setting_multiple":[9,14],"magnetic_setting_a":1500,"contactor":"LC1E120","overload_relay":"LRE482","overload_range_a":[84,135]},
+    {"power_kw":75,"motor_current_380_a":140,"motor_current_415_a":135,"maximum_operational_current_a":150,"breaker":"CVS160-MA","ma_rating_a":150,"magnetic_setting_multiple":[9,14],"magnetic_setting_a":1950,"contactor":"LC1E200","overload_relay":"LRE483","overload_range_a":[124,198]},
+    {"power_kw":90,"motor_current_380_a":170,"motor_current_415_a":160,"maximum_operational_current_a":185,"breaker":"CVS250-MA","ma_rating_a":220,"magnetic_setting_multiple":[9,14],"magnetic_setting_a":2420,"contactor":"LC1E200","overload_relay":"LRE484","overload_range_a":[146,234]},
+    {"power_kw":110,"motor_current_380_a":210,"motor_current_415_a":200,"maximum_operational_current_a":220,"breaker":"CVS250-MA","ma_rating_a":220,"magnetic_setting_multiple":[9,14],"magnetic_setting_a":2860,"contactor":"LC1E200","overload_relay":"LRE484","overload_range_a":[146,234]},
+    {"power_kw":132,"motor_current_380_a":250,"motor_current_415_a":230,"maximum_operational_current_a":265,"breaker":"CVS400-MA","ma_rating_a":320,"magnetic_setting_multiple":[6,13],"magnetic_setting_a":3500,"contactor":"LC1E300","overload_relay":"LRE485","overload_range_a":[174,279]},
+    {"power_kw":160,"motor_current_380_a":300,"motor_current_415_a":270,"maximum_operational_current_a":315,"breaker":"CVS400-MA","ma_rating_a":320,"magnetic_setting_multiple":[6,13],"magnetic_setting_a":4160,"contactor":"LC1E300","overload_relay":"LRE486","overload_range_a":[208,333]},
+    {"power_kw":200,"motor_current_380_a":380,"motor_current_415_a":361,"maximum_operational_current_a":400,"breaker":"CVS630-MA","ma_rating_a":500,"magnetic_setting_multiple":[6,13],"magnetic_setting_a":5700,"contactor":"LC1F400","overload_relay":"LR9-F7379","overload_range_a":[300,500]}
+  ]
+}

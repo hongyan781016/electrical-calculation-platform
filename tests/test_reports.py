@@ -1,4 +1,8 @@
-from src.electrical_calc.reports import create_run_pdf
+from src.electrical_calc.reports import _register_report_font, create_run_pdf
+
+
+def test_pdf_font_falls_back_when_simhei_is_unavailable(tmp_path):
+    assert _register_report_font(tmp_path / "missing-simhei.ttf") == "STSong-Light"
 
 
 def test_pdf_generation_contains_multiple_pages():

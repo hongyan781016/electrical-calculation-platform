@@ -1,6 +1,6 @@
 """电气工程计算自动化平台。"""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 from .breaker_selector import generate_breaker_candidates
 from .cable_selector import generate_cable_candidates
 from .circuit_strategy import (
@@ -10,6 +10,19 @@ from .circuit_strategy import (
 from .combination_solver import solve_complete_circuit_combinations
 from .complete_circuit import CompleteCircuit, affected_calculation_stages
 from .complete_circuit_engine import calculate_complete_circuit_chain
+from .motor_engine import (
+    calculate_motor_cable_preselection,
+    calculate_motor_breaker_requirements,
+    calculate_motor_load,
+    calculate_motor_selection_constraints,
+    calculate_motor_starting_approximation,
+    calculate_motor_starting_network,
+    resolve_motor_starting_voltage_requirement,
+)
+from .motor_catalog import resolve_motor_reference_parameters
+from .motor_circuit_service import evaluate_motor_cable_candidates_in_network
+from .motor_product_protection import evaluate_cm3_motor_reference
+from .motor_control_products import select_motor_control_references
 from .simple_engine import calculate_simple_load_selection
 from .engine import calculate_phase_conductor_thermal_withstand
 from .protection_coordination import (
@@ -33,6 +46,17 @@ __all__ = [
     "CompleteCircuit",
     "affected_calculation_stages",
     "calculate_complete_circuit_chain",
+    "calculate_motor_load",
+    "calculate_motor_cable_preselection",
+    "calculate_motor_breaker_requirements",
+    "calculate_motor_selection_constraints",
+    "calculate_motor_starting_approximation",
+    "calculate_motor_starting_network",
+    "resolve_motor_starting_voltage_requirement",
+    "resolve_motor_reference_parameters",
+    "evaluate_motor_cable_candidates_in_network",
+    "evaluate_cm3_motor_reference",
+    "select_motor_control_references",
     "calculate_simple_load_selection",
     "generate_cable_candidates",
     "generate_breaker_candidates",

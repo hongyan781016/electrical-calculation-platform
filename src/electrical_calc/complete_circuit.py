@@ -349,14 +349,41 @@ def validate_complete_circuit(circuit: CompleteCircuit) -> tuple[ValidationIssue
                 )
             )
     if load.circuit_application == CircuitApplication.MOTOR_FINAL:
-        issues.append(
-            ValidationIssue(
-                "scope.motor_not_implemented",
-                "load.circuit_application",
-                "完整回路V1尚未接入电动机启动及专用保护配合。",
-                "unsupported",
+        if load.phase != Phase.THREE:
+            issues.append(
+                ValidationIssue(
+                    "motor.phase_not_supported",
+                    "load.phase",
+                    "V0.2.0电动机回路仅支持三相电动机。",
+                    "unsupported",
+                )
             )
-        )
+        if load.input_basis == InputBasis.APPARENT_POWER_KVA:
+            issues.append(
+                ValidationIssue(
+                    "motor.input_basis_not_supported",
+                    "load.input_basis",
+                    "V0.2.0电动机回路仅接受额定输出功率或铭牌额定电流。",
+                    "unsupported",
+                )
+            )
+        if load.input_basis == InputBasis.ACTIVE_POWER_KW:
+            if load.power_definition != PowerDefinition.CALCULATED:
+                issues.append(
+                    ValidationIssue(
+                        "motor.rated_output_power_required",
+                        "load.power_definition",
+                        "电动机kW输入必须定义为单机铭牌额定输出功率。",
+                    )
+                )
+            if load.efficiency is None:
+                issues.append(
+                    ValidationIssue(
+                        "motor.efficiency_required",
+                        "load.efficiency",
+                        "按电动机额定输出功率计算电流时必须提供效率。",
+                    )
+                )
 
     nodes = tuple(sorted(circuit.nodes, key=lambda item: item.sequence))
     if len(nodes) < 2:

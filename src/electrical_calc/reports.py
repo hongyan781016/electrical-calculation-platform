@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from reportlab.lib import colors
@@ -9,12 +10,28 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
-FONT = "SimHei"
-pdfmetrics.registerFont(TTFont(FONT, r"C:\Windows\Fonts\simhei.ttf"))
+_SIMHEI_PATH = Path(r"C:\Windows\Fonts\simhei.ttf")
+
+
+def _register_report_font(font_path: Path = _SIMHEI_PATH) -> str:
+    if font_path.is_file():
+        font_name = "SimHei"
+        pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+        return font_name
+
+    # GitHub 的 Windows 测试镜像未安装 SimHei。ReportLab 内置的中文 CID
+    # 字体不依赖系统字体文件，可保证导入、测试和基础中文 PDF 输出可用。
+    font_name = "STSong-Light"
+    pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+    return font_name
+
+
+FONT = _register_report_font()
 
 
 def create_run_pdf(run: dict[str, Any]) -> bytes:

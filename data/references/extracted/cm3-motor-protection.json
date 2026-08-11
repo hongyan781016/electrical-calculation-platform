@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "catalog_code": "CHANGSHU.CM3.MOTOR.2026",
+  "manufacturer": "常熟开关制造有限公司（原常熟开关厂）",
+  "series": "CM3",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "document": "data/references/raw/product-reference/official-web/Changshu_CM3_Catalog_2026-01-12.pdf",
+    "technical_reference": "PDF第12页，C-1",
+    "ordering_reference": "PDF第14页，C-3",
+    "motor_overload_reference": "PDF第20页，C-9",
+    "motor_short_circuit_reference": "PDF第21页，C-10",
+    "curve_reference": "PDF第26～28页，C-15～C-17"
+  },
+  "system_voltage_v": 400,
+  "frames": [
+    {
+      "frame_code": "CM3-63L",
+      "frame_rating_a": 63,
+      "rated_currents_a": [10, 16, 20, 25, 32, 40, 50, 63],
+      "icu_ka": 35,
+      "ics_ka": 35,
+      "poles": [3, 4]
+    },
+    {
+      "frame_code": "CM3-63M",
+      "frame_rating_a": 63,
+      "rated_currents_a": [10, 16, 20, 25, 32, 40, 50, 63],
+      "icu_ka": 50,
+      "ics_ka": 35,
+      "poles": [3, 4]
+    }
+  ],
+  "motor_protection": {
+    "application_code": "2",
+    "trip_mechanism_code": "3",
+    "magnetic_only_trip_mechanism_code": "2",
+    "rated_current_band_a": [10, 63],
+    "overload_characteristic": {
+      "cold_no_trip_current_multiple_in": 1.0,
+      "cold_no_trip_duration_h": 2,
+      "hot_trip_current_multiple_in": 1.2,
+      "hot_trip_max_duration_h": 2
+    },
+    "short_circuit_pickup_rules": [
+      {"rated_current_band_a": [10, 25], "fixed_pickup_a": 300},
+      {"rated_current_band_a": [32, 63], "pickup_multiplier": 12}
+    ],
+    "pickup_tolerance_percent": 20,
+    "short_circuit_action": "instantaneous",
+    "trip_class": 5,
+    "cold_7_2in_trip_time_s": [0.5, 5],
+    "time_current_curve_available": true,
+    "time_current_curve_rated_current_band_a": [10, 63],
+    "curve_digitized": true,
+    "curve_digitization_status": "verified_raster_digitization",
+    "curve_data_file": "data/references/extracted/cm3-63lm-motor-time-current-curve.json",
+    "curve_rated_current_groups_a": [[10], [16], [20], [25], [32, 40, 50, 63]]
+  }
+}

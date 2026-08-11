@@ -10,7 +10,9 @@
     "characteristics_reference": "PDF第14页，A-4",
     "tm_d_reference": "PDF第16页，A-6",
     "ets_reference": "PDF第19页，A-9",
-    "energy_limiting_reference": "PDF第90～91页，D-10～D-11"
+    "energy_limiting_reference": "PDF第90～91页，D-10～D-11",
+    "ma_reference": "PDF第21页，A-11",
+    "ma_time_current_reference": "PDF第89页，D-9"
   },
   "voltage_range_v": [380, 415],
   "frames": [
@@ -72,6 +74,24 @@
     "instantaneous_non_tripping_time_ms": 10,
     "instantaneous_maximum_break_time_ms": 50,
     "maximum_break_time_condition": "I > Ii"
+  },
+  "ma_motor": {
+    "application": "magnetic-only motor short-circuit protection combined with contactor and thermal relay",
+    "ratings": [
+      {"rating_a": 2.5, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 6.3, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 12.5, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 25, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 50, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 100, "frame_code": "CVS100", "setting_multiple": [6, 14]},
+      {"rating_a": 150, "frame_code": "CVS160", "setting_multiple": [9, 14]},
+      {"rating_a": 220, "frame_code": "CVS250", "setting_multiple": [9, 14]},
+      {"rating_a": 320, "frame_code": "CVS400", "setting_multiple": [6, 13]},
+      {"rating_a": 500, "frame_code": "CVS630", "setting_multiple": [6, 13]}
+    ],
+    "instantaneous_total_break_time_s": 0.01,
+    "instantaneous_total_break_time_condition": "fault current above selected magnetic pickup",
+    "formal_calculation_allowed": false
   },
   "energy_limiting_curve": {
     "available": true,

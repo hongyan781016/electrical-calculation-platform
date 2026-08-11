@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block title %}电动机回路 · 电气计算台{% endblock %}
+{% block content %}
+<section class="quick-head circuit-head">
+  <div>
+    <p class="eyebrow">MOTOR CIRCUIT · V0.2</p>
+    <h1>三相电动机回路</h1>
+    <p>当前只处理单台0.4kV三相异步电动机直接启动。用户先给铭牌功率或电流，系统自动形成运行电流、启动电流和通用选型约束。</p>
+  </div>
+  <aside class="quick-badge"><span>当前边界</span><strong>单台 · 三相 · 直接启动</strong><small>星三角、软启动、变频及多电机回路后续增加</small></aside>
+</section>
+
+{% if errors %}<div class="alert danger"><strong>不能计算</strong><ul>{% for item in errors %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" action="/motor" class="circuit-wizard">
+  <input id="motor-cable-path-adjustment" name="cable_path_adjustment" type="hidden" value="{{ form.cable_path_adjustment }}">
+  <section class="panel wizard-section">
+    <div class="wizard-title"><span class="wizard-number">01</span><div><p class="eyebrow">NAMEPLATE</p><h2>你知道什么</h2></div></div>
+    <div class="wizard-grid four">
+      <label>已知量
+        <select name="known_basis">
+          <option value="rated_output_power_kw" {% if form.known_basis == 'rated_output_power_kw' %}selected{% endif %}>铭牌额定输出功率 kW</option>
+          <option value="nameplate_current_a" {% if form.known_basis == 'nameplate_current_a' %}selected{% endif %}>铭牌额定电流 A</option>
+        </select>
+      </label>
+      <label>厂家样本标准功率（kW）
+        <select id="motor-catalog-power-selector" onchange="if(this.value){this.form.elements.known_value.value=this.value}">
+          <option value="">目录外功率</option>
+          {% for power in motor_catalog_powers_kw %}<option value="{{ power }}" {% if form.known_basis == 'rated_output_power_kw' and form.known_value|float == power %}selected{% endif %}>{{ power }} kW{% if power in motor_complete_selection_powers_kw %} · 完整选型{% else %} · 电流/基础电缆{% endif %}</option>{% endfor %}
+        </select>
+        <small>选择后自动填入右侧数值。</small>
+      </label>
+      <label>功率或铭牌电流数值
+        <input name="known_value" type="number" min="0.01" step="0.01" required value="{{ form.known_value }}">
+        <small>目录外功率或铭牌电流可直接修改。</small>
+      </label>
+      <label>额定电压（V）<input name="rated_voltage_v" type="number" min="1" step="1" required value="{{ form.rated_voltage_v }}"></label>
+    </div>
+    <details class="advanced-fields"><summary>目录外功率或实际铭牌与参考样本不同时补充</summary><div class="wizard-grid two"><label>效率 η（%）<input name="motor_efficiency_percent" type="number" min="0.01" max="100" step="0.01" value="{{ form.motor_efficiency_percent }}"><small>来自实际铭牌或厂家样本；不能填写经验估计值。</small></label><label>运行功率因数 cosφ<input name="motor_power_factor" type="number" min="0.01" max="1" step="0.01" value="{{ form.motor_power_factor }}"><small>输入额定输出功率时须与效率同时填写。</small></label></div><p class="inline-help">若已知铭牌额定电流，可直接把“已知量”切换为“铭牌额定电流 A”。</p></details>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-title"><span class="wizard-number">02</span><div><p class="eyebrow">STARTING</p><h2>启动条件</h2></div></div>
+    <div>
+      <div class="wizard-grid two">
+        <label>电动机极数
+          <select name="poles"><option value="4" {% if form.poles == '4' %}selected{% endif %}>4极（当前已有参考目录）</option><option value="2" {% if form.poles == '2' %}selected{% endif %}>2极</option><option value="6" {% if form.poles == '6' %}selected{% endif %}>6极</option></select>
+        </label>
+        <div class="basis-note"><strong>系统预设：</strong>不频繁直接启动；同一母线有照明或电压敏感负荷，启动时母线电压按较严格条件校核。知道实际情况时可在下方修改。</div>
+      </div>
+      <details class="advanced-fields"><summary>修改启动频繁性和同母线负荷</summary><div class="wizard-grid two">
+        <label>启动频繁性
+          <select name="starting_frequency"><option value="infrequent" {% if form.starting_frequency == 'infrequent' %}selected{% endif %}>不频繁启动</option><option value="frequent" {% if form.starting_frequency == 'frequent' %}selected{% endif %}>频繁启动</option><option value="unknown" {% if form.starting_frequency == 'unknown' %}selected{% endif %}>不清楚</option></select>
+        </label>
+        <label>同一母线上的其他负荷
+          <select name="bus_load_condition"><option value="lighting_or_sensitive_loads" {% if form.bus_load_condition == 'lighting_or_sensitive_loads' %}selected{% endif %}>有照明或电压敏感负荷</option><option value="no_lighting_or_sensitive_loads" {% if form.bus_load_condition == 'no_lighting_or_sensitive_loads' %}selected{% endif %}>没有照明或敏感负荷</option><option value="no_other_loads" {% if form.bus_load_condition == 'no_other_loads' %}selected{% endif %}>没有其他负荷</option><option value="unknown" {% if form.bus_load_condition == 'unknown' %}selected{% endif %}>不清楚</option></select>
+        </label>
+      </div></details>
+      <details class="advanced-fields"><summary>有铭牌或厂家资料时补充</summary><div class="wizard-grid two"><label>堵转电流/额定电流倍数<input name="locked_rotor_current_ratio" type="number" min="0.1" step="0.1" value="{{ form.locked_rotor_current_ratio }}"><small>输入铭牌电流时使用；输入功率且目录精确匹配时由系统带出。</small></label></div></details>
+    </div>
+  </section>
+
+  <section class="panel wizard-section">
+    <div class="wizard-title"><span class="wizard-number">03</span><div><p class="eyebrow">CABLE ROUTE</p><h2>线路条件</h2></div></div>
+    <div>
+      <div class="wizard-grid three">
+        <label>导体型号及芯数
+          <select id="motor-conductor-configuration" name="conductor_configuration">
+            <option value="yjv_3c_3ph_pe" {% if form.conductor_configuration == 'yjv_3c_3ph_pe' %}selected{% endif %}>YJV三芯电缆＋独立PE</option>
+            <option value="yjv_4c_3ph_n_pe" {% if form.conductor_configuration == 'yjv_4c_3ph_n_pe' %}selected{% endif %}>YJV四芯电缆（3相＋PE，推荐）</option>
+            <option value="bv_3ph_3wire_pe" {% if form.conductor_configuration == 'bv_3ph_3wire_pe' %}selected{% endif %}>BV三根载流导线＋独立PE</option>
+          </select>
+        </label>
+        <label>敷设方式
+          <select id="motor-installation-scenario" name="installation_scenario"><option value="tray" {% if form.installation_scenario == 'tray' %}selected{% endif %}>槽盒</option><option value="conduit" {% if form.installation_scenario == 'conduit' %}selected{% endif %}>穿管</option><option value="direct_buried" {% if form.installation_scenario == 'direct_buried' %}selected{% endif %}>埋地管槽</option><option value="unknown" {% if form.installation_scenario == 'unknown' %}selected{% endif %}>不清楚</option></select>
+        </label>
+        <label>线路长度（m）<input name="length_m" type="number" min="0.01" step="0.01" required value="{{ form.length_m }}"></label>
+      </div>
+      <p id="motor-cable-compatibility-note" class="inline-help{% if cable_configuration_notice %} warning-text{% endif %}">{% if cable_configuration_notice %}{{ cable_configuration_notice }}{% else %}系统只组合已有核实载流量表的电缆结构与敷设方式。{% endif %}</p>
+      <div class="basis-note"><strong>当前采用的快速工况：</strong>温度{{ form.installation_temperature_c or '待确认' }}℃、槽盒{{ form.tray_layers or '待确认' }}层且每层{{ form.tray_cables_per_layer or '待确认' }}根；{{ form.transformer_family|upper if form.transformer_family else '变压器待确认' }} {{ form.transformer_capacity_kva or '—' }}kVA、uk={{ form.transformer_uk_percent or '—' }}%、上级系统短路容量{{ form.upstream_short_circuit_capacity_mva or '—' }}MVA。默认组合用于快速初选，不代表现场真实电源；已知项目参数时在下方修改。</div>
+      <details class="advanced-fields"><summary>环境温度和成组条件</summary><div class="wizard-grid four"><label>环境/土壤温度（℃）<input name="installation_temperature_c" type="number" step="1" value="{{ form.installation_temperature_c }}"></label><label>槽盒层数<input name="tray_layers" type="number" min="1" step="1" value="{{ form.tray_layers }}"></label><label>每层并列电缆数<input name="tray_cables_per_layer" type="number" min="1" step="1" value="{{ form.tray_cables_per_layer }}"></label><label>穿管/槽内成组回路数<input name="enclosed_circuit_count" type="number" min="1" step="1" value="{{ form.enclosed_circuit_count }}"></label></div></details>
+      <details class="advanced-fields"><summary>修改参考电源或补充实际启动资料</summary><div class="wizard-grid three"><label>变压器系列<select name="transformer_family"><option value="">暂不计算完整网络</option><option value="scb11" {% if form.transformer_family == 'scb11' %}selected{% endif %}>SCB11干式变压器</option><option value="s11_m" {% if form.transformer_family == 's11_m' %}selected{% endif %}>S11-M油浸式变压器</option></select></label><label>变压器容量（kVA）<input name="transformer_capacity_kva" type="number" min="1" step="1" value="{{ form.transformer_capacity_kva }}"></label><label>阻抗电压 uk（%）<input name="transformer_uk_percent" type="number" min="0.1" step="0.1" value="{{ form.transformer_uk_percent }}"></label><label>上级系统短路容量（MVA）<input name="upstream_short_circuit_capacity_mva" type="number" min="0.1" step="0.1" value="{{ form.upstream_short_circuit_capacity_mva }}"><small>快速场景采用100MVA；真实项目以已知系统参数替换。</small></label><label>同母线预接负荷无功（Mvar）<input name="preconnected_reactive_load_mvar" type="number" min="0" step="0.01" value="{{ form.preconnected_reactive_load_mvar }}"><small>项目汇总后由系统推导；留空时不执行启动电压近似法。</small></label><label>电动机实际启动时间（s）<input name="motor_starting_time_s" type="number" min="0.01" step="0.01" value="{{ form.motor_starting_time_s }}"><small>来自实测或厂家资料；不知道可留空，系统不猜。</small></label></div></details>
+      <p class="inline-help">不填写修正条件时仍显示基础载流量候选，但不会标记为已完成选型。</p>
+    </div>
+  </section>
+  <button class="calculate-button" type="submit">计算电动机回路</button>
+</form>
+
+{% if load_result %}
+<section class="quick-output">
+  <div class="workflow-strip">
+    <div class="workflow-stage {% if load_result.outputs.rated_current_a is not none %}state-completed{% endif %}"><span>01</span><strong>运行电流</strong><small>{% if load_result.outputs.rated_current_a is not none %}已计算{% else %}缺参数{% endif %}</small></div>
+    <div class="workflow-stage {% if load_result.outputs.starting_current_a is not none %}state-completed{% endif %}"><span>02</span><strong>启动电流</strong><small>{% if load_result.outputs.starting_current_a is not none %}已计算{% else %}缺参数{% endif %}</small></div>
+    <div class="workflow-stage {% if cable_result and cable_result.outputs.candidates %}state-candidate{% endif %}"><span>03</span><strong>电缆与运行压降</strong><small>{% if cable_result and cable_result.outputs.candidates %}已有基础候选{% else %}待线路参数{% endif %}</small></div>
+    <div class="workflow-stage {% if selection_result %}state-candidate{% endif %}"><span>04</span><strong>器件参数</strong><small>{% if selection_result %}已形成约束{% else %}待启动电流{% endif %}</small></div>
+    <div class="workflow-stage {% if network_result and network_result.outputs.candidates %}state-candidate{% endif %}"><span>05</span><strong>启动与短路</strong><small>{% if network_fault_checks_complete %}故障电流已计算{% elif network_result and network_result.outputs.candidates %}已执行，部分缺参数{% elif form.transformer_family %}被上游参数阻断{% else %}未启用完整网络{% endif %}</small></div>
+    <div class="workflow-stage {% if network_result and network_result.outputs.candidates %}state-candidate{% endif %}"><span>06</span><strong>热稳定与配合</strong><small>{% if network_thermal_checks_complete %}相线与PE热边界已形成{% elif network_result and network_result.outputs.candidates %}仅形成部分热边界{% else %}待网络与产品证据{% endif %}</small></div>
+  </div>
+
+  {% if network_recommended_candidate and network_recommended_candidate.primary_scheme and network_recommended_candidate.primary_scheme.status == '有条件采用' and network_recommended_candidate.primary_scheme.purchase_summary %}
+  {% set final_scheme = network_recommended_candidate.primary_scheme %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">RECOMMENDATION</p><h2>当前推荐与采购参数</h2></div><span class="status-pill pending">{{ final_scheme.status }}</span></div>
+    <p><strong>{{ final_scheme.status_label }}</strong></p>
+    <p class="basis-note">{{ final_scheme.purchase_summary.design_basis }}；方案按现有样本的证据完整度自动收敛，不按品牌排序。</p>
+    <div class="candidate-list">
+      {% for purchase_item in final_scheme.purchase_summary['items'] %}
+      <div>
+        <strong>{{ purchase_item.category }}</strong>
+        <span>{{ purchase_item.specification }}</span>
+        <em>{{ purchase_item.quantity }}；{{ purchase_item.note }}</em>
+      </div>
+      {% endfor %}
+    </div>
+    {% if final_scheme.purchase_conditions %}<div class="alert warning"><strong>购买或安装前必须确认</strong><ul>{% for condition in final_scheme.purchase_conditions %}<li>{{ condition }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
+  {% elif network_recommended_candidate and network_recommended_candidate.primary_scheme %}
+  <div class="alert warning"><strong>当前功率暂不能形成采购方案</strong><ul>{% for reason in network_recommended_candidate.primary_scheme.blocking_reasons %}<li>{{ reason }}</li>{% endfor %}<li>系统仍保留额定电流、启动电流和基础电缆计算，不用不适配的保护器档位强行生成采购规格。</li></ul></div>
+  {% endif %}
+
+  <details class="advanced-fields"><summary>查看计算过程、其他方案和专业校核</summary>
+
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">RESULT</p><h2>电流与启动要求</h2></div><span class="status-pill pending">初算</span></div>
+    <div class="quick-result-grid">
+      <article><span>额定运行电流</span><strong>{% if load_result.outputs.rated_current_a is not none %}{{ load_result.outputs.rated_current_a|round(3) }} A{% else %}无法判断{% endif %}</strong></article>
+      <article><span>直接启动电流</span><strong>{% if load_result.outputs.starting_current_a is not none %}{{ load_result.outputs.starting_current_a|round(2) }} A{% else %}无法判断{% endif %}</strong></article>
+      <article><span>启动时母线最低电压</span><strong>{% if voltage_requirement.outputs.minimum_bus_voltage_percent is not none %}≥ {{ voltage_requirement.outputs.minimum_bus_voltage_percent }}% Un{% elif voltage_requirement.outputs.conservative_preselection_percent is defined %}暂按 {{ voltage_requirement.outputs.conservative_preselection_percent }}% Un{% else %}按启动转矩确定{% endif %}</strong></article>
+      <article><span>依据批准状态</span><strong class="unknown-text">{{ load_result.status }}</strong></article>
+    </div>
+  </section>
+
+  {% if catalog_result and catalog_result.outputs.matched %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">REFERENCE MOTOR</p><h2>系统自动带出的参考参数</h2></div><span class="status-pill pending">产品参考，不是选型</span></div>
+    <dl class="parameter-grid">
+      <div><dt>效率</dt><dd>{{ (catalog_result.outputs.efficiency * 100)|round(1) }}%</dd></div>
+      <div><dt>运行功率因数</dt><dd>{{ catalog_result.outputs.power_factor }}</dd></div>
+      <div><dt>堵转电流倍数</dt><dd>{{ catalog_result.outputs.locked_rotor_current_ratio }} × In</dd></div>
+      <div><dt>来源</dt><dd>Siemens D 81.1 · {{ catalog_result.outputs.source.catalog_page }} · PDF第{{ catalog_result.outputs.source.pdf_page }}页</dd></div>
+    </dl>
+    <p class="basis-note">匹配条件：{{ catalog_result.outputs.source.series_code }}、4极、50Hz、目录额定400V。当前380V运行电流由功率、效率和运行功率因数重新计算；正式复核必须替换为实际电机铭牌或拟购产品数据。</p>
+  </section>
+  {% elif catalog_result %}
+  <div class="alert warning"><strong>没有精确参考行</strong><ul>{% for item in catalog_result.warnings %}<li>{{ item }}</li>{% endfor %}{% if motor_parameter_source != 'manual' %}<li>请补充效率和运行功率因数，或改为输入铭牌额定电流；未取得参数时不按经验值计算。</li>{% endif %}</ul></div>
+  {% endif %}
+
+  {% if motor_parameter_source == 'manual' %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">USER-SUPPLIED DATA</p><h2>用户补充的铭牌或厂家参数</h2></div><span class="status-pill pending">须由用户对来源负责</span></div>
+    <dl class="parameter-grid">
+      <div><dt>效率</dt><dd>{{ (motor_parameter_values.efficiency * 100)|round(1) }}%</dd></div>
+      <div><dt>运行功率因数</dt><dd>{{ motor_parameter_values.power_factor }}</dd></div>
+      <div><dt>堵转电流倍数</dt><dd>{% if motor_parameter_values.locked_rotor_current_ratio is not none %}{{ motor_parameter_values.locked_rotor_current_ratio }} × In{% else %}未提供{% endif %}</dd></div>
+      <div><dt>参数来源</dt><dd>用户填写的实际铭牌或厂家资料</dd></div>
+    </dl>
+  </section>
+  {% endif %}
+
+  {% if cable_result %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">MOTOR CABLE</p><h2>电缆基础候选与运行压降</h2></div><span class="status-pill pending">{% if cable_result.outputs.conditions_complete %}修正条件完整{% else %}缺少修正条件{% endif %}</span></div>
+    {% if cable_result.outputs.candidates %}
+    {% if network_recommended_candidate %}{% set primary_cable = network_recommended_candidate.cable %}{% else %}{% set primary_cable = cable_result.outputs.candidates[0] %}{% endif %}
+    <div class="selection-grid">
+      <article class="selection-card">
+        <h3>{% if network_recommendation_level == 'network_checked' %}推荐截面：{% else %}首选基础截面：{% endif %}{{ primary_cable.cable_specification }}</h3>
+        <p>修正后载流量 {{ primary_cable.corrected_ampacity_a|round(2) }} A；{% if primary_cable.running_voltage_drop_percent is not none %}运行压降 {{ primary_cable.running_voltage_drop_percent|round(3) }}%{% else %}运行压降待参数{% endif %}。</p>
+        <p><strong>选择理由：</strong>{% if network_recommendation_level == 'network_checked' %}这是按截面从小到大，第一个同时通过载流量、运行压降、末端故障电流、相线/PE热稳定及已启用启动电压校核的候选。{% else %}这是当前满足载流量和运行压降条件的最小基础候选。{% endif %}</p>
+        <p class="basis-note">{% if network_recommendation_level == 'network_checked' %}可作为当前计算条件下的推荐设计截面；最终采购仍应绑定实际保护器件和施工条件。{% else %}短路、相—PE故障或热稳定未闭合，暂不能作为最终采购规格。若采用YJV三芯＋独立PE，还须取得独立PE的截面与相对敷设几何参数；使用推荐的四芯3相＋PE结构可自动完成现有表列路径。{% endif %}</p>
+      </article>
+    </div>
+    {% if not network_recommended_candidate and cable_result.outputs.candidates|length > 1 %}<details class="advanced-fields"><summary>查看其他基础电缆备选</summary><div class="candidate-list">{% for cable in cable_result.outputs.candidates[1:4] %}<div><strong>{{ cable.cable_specification }}</strong><span>修正后载流量 {{ cable.corrected_ampacity_a|round(2) }} A</span><em>{% if cable.running_voltage_drop_percent is not none %}运行压降 {{ cable.running_voltage_drop_percent|round(3) }}%{% else %}压降待参数{% endif %}</em></div>{% endfor %}</div></details>{% endif %}
+    {% else %}<div class="alert warning"><strong>没有电缆候选</strong><ul>{% for item in cable_result.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if selection_result %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">SELECTION CONSTRAINTS</p><h2>通用器件参数约束</h2></div><span>暂不输出产品型号</span></div>
+    <div class="selection-grid">
+      {% set constraint_cable = network_recommended_candidate.cable if network_recommended_candidate else (cable_result.outputs.candidates[0] if cable_result and cable_result.outputs.candidates else none) %}
+      <article class="selection-card"><h3>短路保护断路器</h3><p><strong>长延时规范关系：</strong>整定电流应接近且不小于电动机额定电流 {{ selection_result.outputs.breaker_long_delay_min_a|round(2) }} A。</p>{% if constraint_cable %}<p><strong>导体保护上限：</strong>长延时整定电流不得超过所选电缆修正后载流量 {{ constraint_cable.corrected_ampacity_a|round(2) }} A。</p><p><strong>允许整定区间：</strong>{{ selection_result.outputs.breaker_long_delay_min_a|round(2) }}～{{ constraint_cable.corrected_ampacity_a|round(2) }} A；还须从产品实际Ir档位中选取。</p>{% endif %}<p>原依据没有给出“接近”的百分比上限，系统不伪造数值范围。</p><p><strong>瞬时整定明确范围：</strong>{{ selection_result.outputs.breaker_instantaneous_setting_min_a|round(1) }}～{{ selection_result.outputs.breaker_instantaneous_setting_max_a|round(1) }} A（启动电流的2～2.5倍）。</p></article>
+      <article class="selection-card"><h3>AC-3接触器</h3><p>额定工作电流应不小于电动机额定电流 {{ selection_result.outputs.contactor_ac3_working_current_min_a|round(2) }} A，并同时满足380～400V下的电动机功率档。</p></article>
+      {% set constraint_relay = control_product_result.recommended_overload_relay if control_product_result else none %}
+      <article class="selection-card"><h3>热继电器</h3><p><strong>规范整定关系：</strong>整定电流应接近且不小于电动机额定电流。</p><p><strong>本回路计算整定值：</strong>{{ selection_result.outputs.overload_setting_target_a|round(2) }} A。</p><p><strong>规范可调范围要求：</strong>调整范围不小于热继电器额定电流的20%。</p>{% if constraint_relay %}<p><strong>所选产品可调范围：</strong>{{ constraint_relay.setting_min_a }}～{{ constraint_relay.setting_max_a }} A；本回路整定值位于范围内。</p>{% endif %}</article>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if control_product_result and control_product_result.contactor_candidate %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">MOTOR CONTROL</p><h2>主保护与控制方案</h2></div><span class="status-pill pending">按证据完整度自动收敛</span></div>
+    {% set recommended_relay = control_product_result.recommended_overload_relay %}
+    <div class="selection-grid">
+      <article class="selection-card">
+        {% if network_recommended_candidate and network_recommended_candidate.primary_scheme %}
+        {% set scheme = network_recommended_candidate.primary_scheme %}
+        <h3>主方案：{{ scheme.architecture }}</h3>
+        <p><strong>当前结论：</strong>{{ scheme.status }} — {{ scheme.status_label }}</p>
+        <p><strong>选取原则：</strong>{{ scheme.selection_basis }}</p>
+        {% if scheme.closed_checks %}<p><strong>已闭合：</strong>{{ scheme.closed_checks|join('、') }}</p>{% endif %}
+        {% if scheme.purchase_conditions %}<div class="alert warning"><strong>采购或调试前必须确认</strong><ul>{% for condition in scheme.purchase_conditions %}<li>{{ condition }}</li>{% endfor %}</ul></div>{% endif %}
+        <p class="basis-note">系统只选择一条主结构；电动机保护型断路器已经承担过载保护时，不重复配置独立热继电器。跨品牌组合不等于取得制造商1类/2类配合认证，该项单列为专业深化条件。</p>
+        {% else %}
+        <h3>当前主方案：独立热继电器</h3>
+        <p><strong>短路保护器：</strong>待首选电缆的末端故障电流、Icu及切除时间闭合后确定。</p>
+        <p><strong>接触器：</strong>{{ control_product_result.contactor_candidate.model }} / 380～400V AC-3，{{ control_product_result.contactor_candidate.rated_current_a }} A / {{ control_product_result.contactor_candidate.motor_power_kw }} kW。</p>
+        {% if recommended_relay %}<p><strong>热继电器：</strong>{{ recommended_relay.frame }} {{ recommended_relay.setting_min_a }}～{{ recommended_relay.setting_max_a }} A，整定至 {{ recommended_relay.setting_target_a|round(2) }} A，Class {{ recommended_relay.trip_class }}。</p>{% endif %}
+        <p class="basis-note">本方案结构：短路保护器件＋AC-3接触器＋独立热继电器；短路保护器的过载段不得与热继电器重复承担同一保护结论。</p>
+        {% endif %}
+      </article>
+    </div>
+    <details class="advanced-fields"><summary>查看其他品牌方案与专业校核依据</summary>
+    {% if network_recommended_candidate and network_recommended_candidate.product_scheme_candidates|length > 1 %}
+    <div class="selection-grid">
+      {% for alternative in network_recommended_candidate.product_scheme_candidates[1:] %}
+      <article class="selection-card">
+        <h3>{{ alternative.brand_scope }}：{{ alternative.architecture }}</h3>
+        <p><strong>当前结论：</strong>{{ alternative.status }} — {{ alternative.status_label }}</p>
+        <p><strong>保护器：</strong>{{ alternative.breaker }}</p>
+        <p><strong>接触器：</strong>{{ alternative.contactor or '尚未形成' }}</p>
+        <p><strong>过载保护：</strong>{{ alternative.overload_device }}</p>
+        {% if alternative.blocking_reasons %}<p><strong>未成为主方案的原因：</strong>{{ alternative.blocking_reasons|join('、') }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="selection-grid">
+      <article class="selection-card"><h3>其他热继电器档位</h3>{% for relay in control_product_result.overload_relay_candidates %}{% if not recommended_relay or relay.setting_min_a != recommended_relay.setting_min_a or relay.setting_max_a != recommended_relay.setting_max_a %}<p>{{ relay.frame }} {{ relay.setting_min_a }}～{{ relay.setting_max_a }} A；整定目标 {{ relay.setting_target_a|round(2) }} A。</p>{% endif %}{% endfor %}<p>启动时间校核：{{ control_product_result.overload_starting_time_check }}</p></article>
+      <article class="selection-card"><h3>组合状态</h3><p>制造商2类配合正式状态：{{ control_product_result.type_2_coordination_status }}</p><p>制造商2类配合暂算：{{ control_product_result.type_2_coordination_provisional_status }}</p>{% if control_product_result.installation_point_max_short_circuit_ka is not none %}<p>安装点最大短路电流：{{ control_product_result.installation_point_max_short_circuit_ka|round(3) }} kA</p>{% endif %}<p>{{ control_product_result.type_2_coordination_applicability }}</p></article>
+    </div>
+    {% if control_product_result.ns2_standalone_candidate %}
+    {% set ns2 = control_product_result.ns2_standalone_candidate %}
+    <div class="selection-grid">
+      <article class="selection-card">
+        <h3>正泰NS2独立产品参数核对</h3>
+        <p>{{ ns2.model }}：框架电流{{ ns2.frame_current_a }} A；过载整定{{ ns2.setting_min_a }}～{{ ns2.setting_max_a }} A，目标{{ ns2.overload_setting_target_a|round(3) }} A（{{ ns2.overload_setting_range_status }}）。</p>
+        <p>瞬时脱扣标称值{{ ns2.instantaneous_release_a }} A；0.8Ii={{ ns2.instantaneous_no_trip_boundary_a|round(1) }} A为0.2s不动作试验边界，1.2Ii={{ ns2.instantaneous_trip_boundary_a|round(1) }} A为0.2s内动作试验边界；当前启动电流校核{{ ns2.starting_instantaneous_status }}。</p>
+        <p>Class 10A冷态标准点：7.2倍整定电流时2＜t≤10s；当前启动倍数{{ ns2.actual_starting_multiple_of_setting|round(3) }}，启动时间校核{{ ns2.class10_cold_starting_time_status }}。</p>
+        <p>400/415V单品Icu {{ ns2.icu_ka_at_400_415v }} kA（{{ ns2.standalone_icu_status }}），Ics {{ ns2.ics_ka_at_400_415v }} kA（{{ ns2.standalone_ics_status }}）；当前系统电压匹配{{ ns2.system_voltage_status }}。</p>
+        <p>正式状态：{{ control_product_result.ns2_standalone_formal_status }}；暂算：{{ control_product_result.ns2_standalone_provisional_status }}</p>
+        <p class="basis-note">{{ control_product_result.ns2_standalone_applicability }}</p>
+      </article>
+      <article class="selection-card">
+        <h3>正泰NS2＋NC8制造商2类配合</h3>
+        {% if control_product_result.integrated_mpcb_candidate %}
+        <p>{{ control_product_result.integrated_mpcb_candidate.mpcb_model }}＋{{ control_product_result.integrated_mpcb_candidate.contactor }}；Iq {{ control_product_result.integrated_mpcb_candidate.iq_ka }} kA。</p>
+        {% endif %}
+        <p>正式状态：{{ control_product_result.integrated_mpcb_formal_status }}；暂算：{{ control_product_result.integrated_mpcb_provisional_status }}</p>
+        <p>{{ control_product_result.integrated_mpcb_applicability }}</p>
+        <p class="basis-note">单品过载、瞬时和分断参数，与厂家短路条件下的2类配合，是两项不同证据；前者满足不能替代后者。</p>
+      </article>
+    </div>
+    {% endif %}
+    <div class="selection-grid">
+      {% for architecture in control_product_result.protection_architectures %}
+      <article class="selection-card">
+        <h3>{{ architecture.title }}</h3>
+        <p>{{ architecture.devices }}</p>
+        <p><strong>过载保护：</strong>{{ architecture.overload_protection }}</p>
+        <p><strong>当前状态：</strong>{{ architecture.status }}</p>
+        <p>{{ architecture.unresolved }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    {% if control_product_result.siemens_ie3_type2_candidates %}
+    <div class="selection-grid"><article class="selection-card"><h3>IE3/IE4制造商2类配合参考</h3>{% for candidate in control_product_result.siemens_ie3_type2_candidates %}<p>{{ candidate.load_feeder_article }}：整定{{ candidate.setting_min_a }}～{{ candidate.setting_max_a }} A；{{ candidate.motor_starter_protector }}＋{{ candidate.contactor }}＋{{ candidate.link_module }}</p><p>启动电流≤{{ candidate.ie3_ie4_starting_current_limit_a }} A（{{ candidate.starting_current_limit_status }}）；单品Icu {{ candidate.standalone_icu_ka_at_400v }} kA（{{ candidate.standalone_icu_status }}）；启动时间校核{{ candidate.class10_cold_starting_time_status }}。</p>{% endfor %}<p>暂算：{{ control_product_result.siemens_ie3_type2_provisional_status }}。{{ control_product_result.siemens_ie3_type2_applicability }}</p><p class="basis-note">完整动作曲线与最终配合证据保留在专业复核中，不占用输入区域。</p></article></div>
+    {% endif %}
+    <p class="basis-note">来源：正泰NXC样本PDF第3、5页；NXR样本PDF第2～4页；NS2专用目录PDF第1～4页。所有产品资料均为已核实、未批准；页面只形成带适用条件的产品参考，不代表品牌推荐。</p>
+    </details>
+  </section>
+  {% endif %}
+
+  {% if network_result %}
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">COMPLETE MOTOR NETWORK</p><h2>推荐电缆完整网络复核</h2></div><span class="status-pill pending">{% if network_recommendation_level == 'network_checked' %}已形成推荐设计截面{% else %}只能基础初选{% endif %}</span></div>
+    {% if network_result.outputs.candidates %}
+    {% set item = network_recommended_candidate %}
+    <div class="selection-grid">
+      <article class="selection-card">
+        <h3>{% if network_recommendation_level == 'network_checked' %}推荐：{% else %}基础首选：{% endif %}{{ item.cable.cable_specification }}</h3>
+        <p>运行压降：{% if item.running_voltage_drop_check.actual_percent is not none %}{{ item.running_voltage_drop_check.actual_percent|round(4) }}% / 限值{{ item.running_voltage_drop_check.limit_percent }}%（{{ item.running_voltage_drop_check.status }}）{% else %}无法判断{% endif %}</p>
+        <p>末端最大三相短路：{% if item.chain.outputs.terminal_three_phase_short_circuit_ka is defined and item.chain.outputs.terminal_three_phase_short_circuit_ka is not none %}{{ item.chain.outputs.terminal_three_phase_short_circuit_ka|round(4) }} kA{% else %}无法判断{% endif %}</p>
+        <p>末端最小相—PE故障：{% if item.chain.outputs.terminal_earth_fault_current_a is defined and item.chain.outputs.terminal_earth_fault_current_a is not none %}{{ item.chain.outputs.terminal_earth_fault_current_a|round(2) }} A{% else %}无法判断{% endif %}</p>
+        <p>相导体允许最长切除：{% if item.phase_thermal_constraint.outputs.maximum_permitted_clearing_time_s is defined %}{{ item.phase_thermal_constraint.outputs.maximum_permitted_clearing_time_s }} s{% else %}无法判断{% endif %}</p>
+        <p>PE允许最长切除：{% if item.pe_thermal_constraint and item.pe_thermal_constraint.outputs.maximum_permitted_clearing_time_s is defined %}{{ item.pe_thermal_constraint.outputs.maximum_permitted_clearing_time_s }} s{% else %}无法判断{% endif %}</p>
+        <p>启动母线/端子电压：{% if item.starting_voltage and item.starting_voltage.outputs.starting_bus_voltage_percent is defined and item.starting_voltage.outputs.starting_motor_terminal_voltage_percent is defined %}{{ item.starting_voltage.outputs.starting_bus_voltage_percent|round(2) }}% / {{ item.starting_voltage.outputs.starting_motor_terminal_voltage_percent|round(2) }}%{% else %}无法判断{% endif %}</p>
+        <p><strong>综合判定：</strong>{{ item.cable_decision_status }}{% if item.cable_pending_checks %}；尚缺 {{ item.cable_pending_checks|join('、') }}{% endif %}</p>
+        <details class="advanced-fields"><summary>查看断路器参数及专业校核依据</summary>
+        {% if item.breaker_requirements %}
+        {% set breaker_required = item.breaker_requirements.outputs.required_parameters %}
+        <hr>
+        <h4>该电缆对应的断路器必须满足</h4>
+        <p>额定电流：{{ breaker_required.rated_current_min_a|round(2) }}～{{ breaker_required.rated_current_max_a|round(2) }} A</p>
+        <p>额定电压：≥ {{ breaker_required.rated_voltage_min_v|round(0) }} V；Icu：≥ {{ breaker_required.breaking_capacity_min_ka|round(3) }} kA</p>
+        <p>启动避让整定：{{ breaker_required.instantaneous_setting_start_min_a|round(1) }}～{{ breaker_required.instantaneous_setting_start_max_a|round(1) }} A</p>
+        <p>末端最小故障电流：{{ breaker_required.terminal_minimum_fault_current_a|round(1) }} A；允许切除时间：≤ {{ breaker_required.governing_maximum_clearing_time_s }} s</p>
+        {% if item.breaker_requirements.outputs.candidates %}
+        <p>通用参数档位：{% for breaker in item.breaker_requirements.outputs.candidates[:3] %}{{ breaker.family }} {{ breaker.frame_current_a|round(0) }}框架 / In {{ breaker.rated_current_a|round(0) }} A / Icu {{ breaker.selected_icu_ka|round(1) }} kA{% if not loop.last %}；{% endif %}{% endfor %}</p>
+        <p>瞬时切除末端故障：{% if item.breaker_requirements.outputs.candidates[0].instantaneous_terminal_fault_possible == '通过' %}存在可行整定范围{% else %}不能仅凭瞬时段证明，须查实际反时限曲线{% endif %}</p>
+        {% else %}<p class="unknown-text">当前通用档位没有同时满足电流和Icu边界的候选。</p>{% endif %}
+        {% endif %}
+        {% if item.ns2_motor_reference %}
+        <h4>正泰NS2逐电缆候选联动（不是品牌推荐）</h4>
+        <p>{{ item.ns2_motor_reference.model }} / 整定{{ item.ns2_motor_reference.setting_min_a }}～{{ item.ns2_motor_reference.setting_max_a }} A / 目标{{ item.ns2_motor_reference.overload_setting_target_a|round(3) }} A。</p>
+        <p>安装点最大短路对应单品Icu校核：{{ item.ns2_motor_reference.standalone_icu_status }}；Ics对照：{{ item.ns2_motor_reference.standalone_ics_status }}；系统电压匹配：{{ item.ns2_motor_reference.system_voltage_status }}。</p>
+        <p>末端最小故障电流{{ item.ns2_motor_reference.terminal_minimum_fault_current_a|round(2) }} A；0.8Ii不动作边界{{ item.ns2_motor_reference.instantaneous_no_trip_boundary_a|round(1) }} A，1.2Ii保证动作边界{{ item.ns2_motor_reference.instantaneous_trip_boundary_a|round(1) }} A；进入保证瞬时动作区：{{ item.ns2_motor_reference.terminal_guaranteed_instantaneous_status }}。</p>
+        <p>相线/PE共同要求的最长切除时间：{{ item.ns2_motor_reference.governing_maximum_clearing_time_s|round(6) }} s；NS2完整切除时间校核：{{ item.ns2_motor_reference.total_clearing_time_status }}。</p>
+        <p class="basis-note">{{ item.ns2_motor_reference.total_clearing_time_evidence }}</p>
+        {% endif %}
+        {% if item.cdm3e_motor_reference and item.cdm3e_motor_reference.model is defined %}
+        <h4>路线B补充：德力西CDM3E电子式MCCB</h4>
+        <p>{{ item.cdm3e_motor_reference.model }} / 长延时{{ item.cdm3e_motor_reference.long_delay_mode }}（过载由独立热继电器承担） / Icu 400/415V {{ item.cdm3e_motor_reference.icu_ka_at_400_415v|round(0) }} kA。</p>
+        <p>短延时标称整定：{{ item.cdm3e_motor_reference.short_delay_multiplier }}×{{ item.cdm3e_motor_reference.controller_rated_current_a|round(0) }}＝{{ item.cdm3e_motor_reference.short_delay_pickup_nominal_a|round(1) }} A；启动避让：{{ item.cdm3e_motor_reference.starting_nominal_ride_through_status }}；末端故障达到标称拾取：{{ item.cdm3e_motor_reference.terminal_nominal_pickup_status }}。</p>
+        <p>I²t OFF，tsd={{ item.cdm3e_motor_reference.short_delay_setting_s }} s，厂家表列最大断开时间{{ item.cdm3e_motor_reference.short_delay_maximum_breaking_time_s }} s；电缆允许最长{{ item.cdm3e_motor_reference.governing_maximum_clearing_time_s|round(6) }} s；按标称整定暂算热稳定：{{ item.cdm3e_motor_reference.nominal_thermal_time_status }}。</p>
+        <p>系统电压表列匹配：{{ item.cdm3e_motor_reference.system_voltage_status }}；Icu校核：{{ item.cdm3e_motor_reference.icu_status }}；短延时拾取保证：{{ item.cdm3e_motor_reference.short_delay_pickup_guarantee_status }}；制造商1/2类配合：{{ item.cdm3e_motor_reference.type_2_coordination_status }}。</p>
+        <p class="basis-note">{{ item.cdm3e_motor_reference.applicability }}</p>
+        {% endif %}
+        {% if item.cm3_motor_reference and item.cm3_motor_reference.frame_code is defined %}
+        <h4>新版同类产品参考（不是品牌推荐）</h4>
+        <p>{{ item.cm3_motor_reference.frame_code }} 电动机保护型 / In {{ item.cm3_motor_reference.rated_current_a|round(0) }} A / Icu {{ item.cm3_motor_reference.icu_ka|round(0) }} kA / Ics {{ item.cm3_motor_reference.ics_ka|round(0) }} kA</p>
+        <p>瞬时整定：12In＝{{ item.cm3_motor_reference.short_circuit_pickup_nominal_a|round(1) }} A，计±20%后 {{ item.cm3_motor_reference.short_circuit_pickup_min_a|round(1) }}～{{ item.cm3_motor_reference.short_circuit_pickup_max_a|round(1) }} A</p>
+        <p>过载基准：固定In {{ item.cm3_motor_reference.overload_reference_current_a|round(1) }} A，相对电动机额定电流偏高{{ item.cm3_motor_reference.overload_current_deviation_percent|round(2) }}%；“不小于”={{ item.cm3_motor_reference.overload_setting_not_below_motor_status }}，“接近”={{ item.cm3_motor_reference.overload_setting_closeness_status }}</p>
+        <p>产品保证点：1.0In={{ item.cm3_motor_reference.cold_no_trip_current_a|round(1) }} A冷态2h内不动作；1.2In={{ item.cm3_motor_reference.hot_trip_current_a|round(1) }} A热态2h内动作。电动机1.2倍额定电流={{ item.cm3_motor_reference.motor_120_percent_current_a|round(1) }} A，保证动作={{ item.cm3_motor_reference.motor_120_percent_trip_guarantee_status }}</p>
+        <p>与电动机允许过载特性匹配：{{ item.cm3_motor_reference.motor_overload_characteristic_match_status }}（缺电动机过载曲线时不猜）</p>
+        <p>启动电流避让：{{ item.cm3_motor_reference.starting_instantaneous_ride_through_status }}；末端故障进入瞬时段：{{ item.cm3_motor_reference.terminal_instantaneous_trip_status }}</p>
+        {% if item.cm3_motor_reference.motor_starting_curve_bounds %}<p>启动电流下曲线动作区间：{{ item.cm3_motor_reference.motor_starting_curve_bounds.minimum_trip_time_s|round(3) }}～{{ item.cm3_motor_reference.motor_starting_curve_bounds.maximum_trip_time_s|round(3) }} s；启动时间校核：{{ item.cm3_motor_reference.motor_starting_time_check }}</p>{% endif %}
+        {% if item.cm3_motor_reference.phase_fault_curve_bounds %}<p>安装点相间故障：曲线最长{{ item.cm3_motor_reference.phase_fault_curve_bounds.maximum_trip_time_s|round(4) }} s / 电缆允许{{ item.cm3_motor_reference.phase_maximum_clearing_time_s }} s（{{ item.cm3_motor_reference.phase_fault_clearing_time_check }}）</p>{% endif %}
+        {% if item.cm3_motor_reference.pe_fault_curve_bounds %}<p>末端相—PE故障：曲线最长{{ item.cm3_motor_reference.pe_fault_curve_bounds.maximum_trip_time_s|round(4) }} s / PE允许{{ item.cm3_motor_reference.pe_maximum_clearing_time_s }} s（{{ item.cm3_motor_reference.pe_fault_clearing_time_check }}）</p>{% endif %}
+        <p class="basis-note">来源：CM3样本C-1、C-3、C-9、C-10、C-17。曲线采用保守栅格数字化边界、不插值；实际启动时间留空时，启动过程仍为无法判断。</p>
+        {% elif item.cm3_motor_reference %}<p class="basis-note">CM3参考未形成：{{ item.cm3_motor_reference.reason }}</p>{% endif %}
+        </details>
+      </article>
+    </div>
+    {% if not network_fault_checks_complete or not network_thermal_checks_complete %}<div class="alert warning"><strong>当前只能推荐基础截面</strong><ul><li>首选规格已经通过现有载流量和运行压降条件。</li><li>末端短路、相—PE故障或PE热稳定未闭合前，不作为最终采购规格。</li></ul></div>{% endif %}
+    {% if network_result.outputs.candidates|length > 1 %}<details class="advanced-fields"><summary>查看其他电缆备选的网络结果</summary><div class="candidate-list">{% for alternative in network_result.outputs.candidates[:4] %}{% if alternative.cable.cable_specification != item.cable.cable_specification %}<div><strong>{{ alternative.cable.cable_specification }}</strong><span>运行压降 {% if alternative.running_voltage_drop_check.actual_percent is not none %}{{ alternative.running_voltage_drop_check.actual_percent|round(4) }}%{% else %}待判断{% endif %}</span><em>综合判定：{{ alternative.cable_decision_status }}</em></div>{% endif %}{% endfor %}</div></details>{% endif %}
+    <p class="basis-note">短路、接地故障、热稳定和断路器硬条件均随电缆截面重新计算。通用参数档位不是产品型号；只有实际脱扣器的调节范围、时间—电流曲线或I²t满足后，才可形成最终结论。</p>
+    {% else %}<div class="alert warning"><strong>完整网络无法形成</strong><ul>{% for item in network_result.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  </section>
+  {% endif %}
+
+  <div class="alert warning"><strong>专业深化项</strong><ul><li>目录没有堵转功率因数，不能把运行功率因数代入启动网络R/X精确计算。</li>{% if not network_result %}<li>尚未输入变压器完整条件，启动压降、短路、接地故障和热稳定未进入网络复核。</li>{% elif network_recommended_candidate and network_recommended_candidate.primary_scheme %}{% for pending in network_recommended_candidate.primary_scheme.professional_pending %}<li>{{ pending }}</li>{% endfor %}{% else %}<li>尚未形成同一电缆与保护器件绑定的主方案。</li>{% endif %}</ul><p class="basis-note">这些项目与上方“采购或调试前必须确认”分开管理；深化项不会把已经闭合的载流量、压降或故障计算重新显示成无法判断。</p></div>
+  </details>
+</section>
+{% else %}
+<div class="quick-placeholder compact"><span>1</span><strong>填铭牌功率或电流</strong><span>2</span><strong>系统取得参考参数</strong><span>3</span><strong>计算运行与启动电流</strong><span>4</span><strong>形成器件约束</strong></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const configuration = document.getElementById('motor-conductor-configuration');
+  const scenario = document.getElementById('motor-installation-scenario');
+  const note = document.getElementById('motor-cable-compatibility-note');
+  const adjustment = document.getElementById('motor-cable-path-adjustment');
+  if (!configuration || !scenario || !note || !adjustment) return;
+  scenario.addEventListener('change', () => {
+    if (scenario.value === 'conduit' && configuration.value === 'yjv_4c_3ph_n_pe') {
+      configuration.value = 'yjv_3c_3ph_pe';
+      adjustment.value = 'four_core_conduit_to_three_core';
+      note.textContent = 'YJV四芯穿管暂无已核实载流量表，已切换为YJV三芯电缆＋独立PE。';
+    } else {
+      adjustment.value = '';
+    }
+  });
+  configuration.addEventListener('change', () => {
+    if (configuration.value === 'yjv_4c_3ph_n_pe' && scenario.value === 'conduit') {
+      scenario.value = 'tray';
+      adjustment.value = 'four_core_conduit_to_tray';
+      note.textContent = 'YJV四芯当前采用已核实的空气中/槽盒载流量路径，敷设方式已切换为槽盒。';
+    } else {
+      adjustment.value = '';
+    }
+  });
+})();
+</script>
+{% endblock %}

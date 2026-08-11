@@ -31,6 +31,29 @@ from .engine import (
     calculate_transformer_feeder_three_phase_short_circuit,
 )
 from .simple_engine import calculate_simple_load_selection
+from .motor import (
+    MotorBusLoadCondition,
+    MotorCablePreselectionInput,
+    MotorCatalogQuery,
+    MotorKnownBasis,
+    MotorLoadInput,
+    MotorNetworkInput,
+    MotorStartingFrequency,
+    MotorStartingVoltageScenario,
+)
+from .motor_catalog import (
+    AVAILABLE_RATED_OUTPUT_POWERS_KW,
+    COMPLETE_SELECTION_POWERS_KW,
+    resolve_motor_reference_parameters,
+)
+from .motor_circuit_service import evaluate_motor_cable_candidates_in_network
+from .motor_control_products import select_motor_control_references
+from .motor_engine import (
+    calculate_motor_cable_preselection,
+    calculate_motor_load,
+    calculate_motor_selection_constraints,
+    resolve_motor_starting_voltage_requirement,
+)
 from .product_protection import (
     evaluate_easypact_cvs_phase_thermal_reference,
     select_easypact_cvs_reference,
@@ -115,6 +138,402 @@ def quick_page(request: Request):
     return templates.TemplateResponse(
         request=request, name="quick.html",
         context={"form": form, "result": None, "load_groups": grouped_load_types(), "scenarios": INSTALLATION_SCENARIOS, "conductor_configurations": CONDUCTOR_CONFIGURATIONS, "tray_options": TRAY_CONFIGURATION_OPTIONS, "transformer_capacities": sorted(TRANSFORMER_LV_SHORT_CIRCUIT["rows"]), "fault_transformer_series": TRANSFORMER_PHASE_PE_IMPEDANCE["series"], "fault_transformer_capacities": sorted({capacity for series in TRANSFORMER_PHASE_PE_IMPEDANCE["series"].values() for capacity in series["rows"]}), "busway_phase_pe_series": BUSWAY_PHASE_PE_IMPEDANCE["series"], "busway_phase_pe_ratings": sorted({rating for series in BUSWAY_PHASE_PE_IMPEDANCE["series"].values() for rating in series["rows"]})},
+    )
+
+
+def _motor_form_defaults() -> dict[str, str]:
+    return {
+        "known_basis": "rated_output_power_kw",
+        "known_value": "30",
+        "rated_voltage_v": "380",
+        "poles": "4",
+        "motor_efficiency_percent": "",
+        "motor_power_factor": "",
+        "locked_rotor_current_ratio": "",
+        "starting_frequency": "infrequent",
+        "bus_load_condition": "lighting_or_sensitive_loads",
+        "conductor_configuration": "yjv_4c_3ph_n_pe",
+        "cable_path_adjustment": "",
+        "installation_scenario": "tray",
+        "length_m": "50",
+        "installation_temperature_c": "40",
+        "tray_layers": "1",
+        "tray_cables_per_layer": "1",
+        "enclosed_circuit_count": "",
+        "transformer_family": "scb11",
+        "transformer_capacity_kva": "630",
+        "transformer_uk_percent": "6",
+        "upstream_short_circuit_capacity_mva": "100",
+        "preconnected_reactive_load_mvar": "",
+        "motor_starting_time_s": "",
+    }
+
+
+@app.get("/motor", response_class=HTMLResponse)
+def motor_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="motor.html",
+        context={
+            "form": _motor_form_defaults(),
+            "errors": [],
+            "catalog_result": None,
+            "load_result": None,
+            "voltage_requirement": None,
+            "selection_result": None,
+            "cable_result": None,
+            "network_result": None,
+            "network_fault_checks_complete": False,
+            "network_thermal_checks_complete": False,
+            "control_product_result": None,
+            "cable_configuration_notice": None,
+            "motor_catalog_powers_kw": AVAILABLE_RATED_OUTPUT_POWERS_KW,
+            "motor_complete_selection_powers_kw": COMPLETE_SELECTION_POWERS_KW,
+        },
+    )
+
+
+@app.post("/motor", response_class=HTMLResponse)
+async def motor_calculate(request: Request):
+    submitted = await request.form()
+    form = {
+        key: str(submitted.get(key, "")).strip()
+        for key in _motor_form_defaults()
+    }
+    cable_configuration_notice = None
+    if form["cable_path_adjustment"] == "four_core_conduit_to_tray":
+        cable_configuration_notice = (
+            "当前资料没有YJV四芯穿管基础载流量表，系统保留四芯结构并改用"
+            "有已核实表格的槽盒敷设。若必须穿管，请改选YJV三芯电缆＋独立PE。"
+        )
+    elif form["cable_path_adjustment"] == "four_core_conduit_to_three_core" or (
+        form["conductor_configuration"] == "yjv_4c_3ph_n_pe"
+        and form["installation_scenario"] == "conduit"
+    ):
+        form["conductor_configuration"] = "yjv_3c_3ph_pe"
+        cable_configuration_notice = (
+            "当前资料没有YJV四芯穿管基础载流量表，系统已改用有已核实表格的"
+            "YJV三芯电缆＋独立PE。若必须采用四芯结构，请改选槽盒或埋地管槽。"
+        )
+    errors: list[str] = []
+    try:
+        known_value = float(form["known_value"])
+        voltage_v = float(form["rated_voltage_v"])
+        poles = int(form["poles"])
+        if known_value <= 0 or voltage_v <= 0:
+            raise ValueError
+    except ValueError:
+        errors.append("额定功率或电流、电压必须填写大于0的数值。")
+        known_value = 0.0
+        voltage_v = 0.0
+        poles = 4
+
+    try:
+        known_basis = MotorKnownBasis(form["known_basis"])
+        starting_frequency = MotorStartingFrequency(form["starting_frequency"])
+        bus_condition = MotorBusLoadCondition(form["bus_load_condition"])
+    except ValueError:
+        errors.append("电动机输入方式或启动场景无效。")
+        known_basis = MotorKnownBasis.RATED_OUTPUT_POWER_KW
+        starting_frequency = MotorStartingFrequency.UNKNOWN
+        bus_condition = MotorBusLoadCondition.UNKNOWN
+
+    motor_starting_time_s = None
+    if form["motor_starting_time_s"]:
+        try:
+            motor_starting_time_s = float(form["motor_starting_time_s"])
+            if motor_starting_time_s <= 0:
+                raise ValueError
+        except ValueError:
+            errors.append("电动机实际启动时间必须填写大于0的数值或留空。")
+
+    rules = db.rules_by_code()
+    catalog_result = None
+    efficiency = None
+    power_factor = None
+    locked_ratio = None
+    motor_efficiency_class = None
+    motor_parameter_source = None
+
+    manual_efficiency = None
+    manual_power_factor = None
+    if form["motor_efficiency_percent"]:
+        try:
+            manual_efficiency_percent = float(form["motor_efficiency_percent"])
+            if not 0 < manual_efficiency_percent <= 100:
+                raise ValueError
+            manual_efficiency = manual_efficiency_percent / 100
+        except ValueError:
+            errors.append("效率必须大于0且不大于100%。")
+    if form["motor_power_factor"]:
+        try:
+            manual_power_factor = float(form["motor_power_factor"])
+            if not 0 < manual_power_factor <= 1:
+                raise ValueError
+        except ValueError:
+            errors.append("运行功率因数必须大于0且不大于1。")
+    if (
+        known_basis == MotorKnownBasis.RATED_OUTPUT_POWER_KW
+        and bool(form["motor_efficiency_percent"])
+        != bool(form["motor_power_factor"])
+    ):
+        errors.append("按输出功率计算时，效率和运行功率因数必须同时填写或同时留空。")
+
+    if known_basis == MotorKnownBasis.RATED_OUTPUT_POWER_KW and not errors:
+        catalog_result = resolve_motor_reference_parameters(
+            MotorCatalogQuery(known_value, poles), rules
+        )
+        if catalog_result.outputs["matched"]:
+            efficiency = catalog_result.outputs["efficiency"]
+            power_factor = catalog_result.outputs["power_factor"]
+            locked_ratio = catalog_result.outputs["locked_rotor_current_ratio"]
+            motor_efficiency_class = catalog_result.outputs["source"].get(
+                "efficiency_class"
+            )
+            motor_parameter_source = "catalog"
+
+        if manual_efficiency is not None and manual_power_factor is not None:
+            efficiency = manual_efficiency
+            power_factor = manual_power_factor
+            motor_efficiency_class = None
+            motor_parameter_source = "manual"
+    elif known_basis == MotorKnownBasis.NAMEPLATE_CURRENT_A:
+        power_factor = manual_power_factor
+        motor_parameter_source = "nameplate_current"
+
+    if form["locked_rotor_current_ratio"]:
+        try:
+            locked_ratio = float(form["locked_rotor_current_ratio"])
+            if locked_ratio <= 0:
+                raise ValueError
+        except ValueError:
+            errors.append("堵转电流倍数必须填写大于0的数值。")
+
+    load_result = None
+    voltage_requirement = None
+    selection_result = None
+    cable_result = None
+    network_result = None
+    network_recommended_candidate = None
+    network_recommendation_level = None
+    network_fault_checks_complete = False
+    network_thermal_checks_complete = False
+    control_product_result = None
+    motor_input = None
+    cable_input = None
+    if not errors:
+        motor_input = MotorLoadInput(
+                known_basis=known_basis,
+                known_value=known_value,
+                rated_voltage_v=voltage_v,
+                power_factor=power_factor,
+                efficiency=efficiency,
+                locked_rotor_current_ratio=locked_ratio,
+        )
+        load_result = calculate_motor_load(motor_input, rules)
+        voltage_requirement = resolve_motor_starting_voltage_requirement(
+            MotorStartingVoltageScenario(starting_frequency, bus_condition), rules
+        )
+        rated_current = load_result.outputs.get("rated_current_a")
+        starting_current = load_result.outputs.get("starting_current_a")
+        if rated_current is not None and starting_current is not None:
+            selection_result = calculate_motor_selection_constraints(
+                rated_current, starting_current, rules
+            )
+            control_product_result = select_motor_control_references(
+                motor_rated_current_a=rated_current,
+                motor_starting_current_a=starting_current,
+                motor_rated_output_power_kw=(
+                    known_value
+                    if known_basis == MotorKnownBasis.RATED_OUTPUT_POWER_KW
+                    else None
+                ),
+                system_voltage_v=voltage_v,
+                motor_starting_time_s=motor_starting_time_s,
+                motor_efficiency_class=motor_efficiency_class,
+            )
+        if rated_current is not None:
+            try:
+                length_m = float(form["length_m"])
+                temperature_c = (
+                    float(form["installation_temperature_c"])
+                    if form["installation_temperature_c"]
+                    else None
+                )
+                tray_layers = (
+                    int(form["tray_layers"]) if form["tray_layers"] else None
+                )
+                tray_cables = (
+                    int(form["tray_cables_per_layer"])
+                    if form["tray_cables_per_layer"]
+                    else None
+                )
+                enclosed_count = (
+                    int(form["enclosed_circuit_count"])
+                    if form["enclosed_circuit_count"]
+                    else None
+                )
+                configuration = form["conductor_configuration"]
+                family = "BV" if configuration.startswith("bv_") else "YJV"
+                cable_input = MotorCablePreselectionInput(
+                        rated_current_a=rated_current,
+                        running_power_factor=power_factor,
+                        rated_voltage_v=voltage_v,
+                        length_m=length_m,
+                        conductor_family=family,
+                        conductor_configuration_code=configuration,
+                        installation_scenario=form["installation_scenario"],
+                        installation_temperature_c=temperature_c,
+                        tray_type=(
+                            "horizontal_perforated"
+                            if form["installation_scenario"] == "tray"
+                            else None
+                        ),
+                        tray_layers=tray_layers,
+                        tray_cables_per_layer=tray_cables,
+                        enclosed_circuit_count=enclosed_count,
+                )
+                cable_result = calculate_motor_cable_preselection(
+                    cable_input, rules
+                )
+            except ValueError:
+                errors.append("线路长度及补充敷设条件必须填写有效数值。")
+        network_fields = (
+            form["transformer_family"],
+            form["transformer_capacity_kva"],
+            form["transformer_uk_percent"],
+        )
+        if all(network_fields) and motor_input is not None and cable_input is not None:
+            try:
+                motor_u0, _ = _derive_nominal_line_to_earth_voltage(
+                    "3", str(voltage_v)
+                )
+                network_result = evaluate_motor_cable_candidates_in_network(
+                    motor_input,
+                    cable_input,
+                    MotorNetworkInput(
+                        transformer_family=form["transformer_family"],
+                        transformer_capacity_kva=float(
+                            form["transformer_capacity_kva"]
+                        ),
+                        transformer_uk_percent=float(
+                            form["transformer_uk_percent"]
+                        ),
+                        upstream_short_circuit_capacity_mva=float(
+                            form["upstream_short_circuit_capacity_mva"] or "100"
+                        ),
+                        system_voltage_v=voltage_v,
+                        line_to_earth_voltage_v=float(motor_u0),
+                        minimum_starting_bus_voltage_percent=(
+                            voltage_requirement.outputs.get(
+                                "minimum_bus_voltage_percent"
+                            )
+                        ),
+                        preconnected_reactive_load_mvar=(
+                            float(form["preconnected_reactive_load_mvar"])
+                            if form["preconnected_reactive_load_mvar"]
+                            else None
+                        ),
+                        motor_starting_time_s=motor_starting_time_s,
+                    ),
+                    rules,
+                )
+                network_candidates = network_result.outputs.get("candidates", [])
+                recommended_position = network_result.outputs.get(
+                    "recommended_candidate_position"
+                )
+                if recommended_position is not None:
+                    network_recommended_candidate = network_candidates[
+                        int(recommended_position)
+                    ]
+                    network_recommendation_level = "network_checked"
+                elif network_candidates:
+                    network_recommended_candidate = network_candidates[0]
+                    network_recommendation_level = "basic_only"
+                network_fault_checks_complete = bool(network_candidates) and all(
+                    item["chain"]["outputs"].get(
+                        "terminal_three_phase_short_circuit_ka"
+                    )
+                    is not None
+                    and item["chain"]["outputs"].get(
+                        "terminal_earth_fault_current_a"
+                    )
+                    is not None
+                    for item in network_candidates
+                )
+                network_thermal_checks_complete = bool(network_candidates) and all(
+                    item["phase_thermal_constraint"]["outputs"].get(
+                        "maximum_permitted_clearing_time_s"
+                    )
+                    is not None
+                    and item.get("pe_thermal_constraint") is not None
+                    and item["pe_thermal_constraint"]["outputs"].get(
+                        "maximum_permitted_clearing_time_s"
+                    )
+                    is not None
+                    for item in network_candidates
+                )
+                if control_product_result and network_candidates:
+                    nodes = network_candidates[0]["chain"]["outputs"].get(
+                        "node_results", []
+                    )
+                    installation_ik_ka = (
+                        nodes[0].get("three_phase_short_circuit_ka")
+                        if nodes
+                        else None
+                    )
+                    control_product_result = select_motor_control_references(
+                        motor_rated_current_a=float(rated_current),
+                        motor_starting_current_a=float(starting_current),
+                        motor_rated_output_power_kw=(
+                            known_value
+                            if known_basis
+                            == MotorKnownBasis.RATED_OUTPUT_POWER_KW
+                            else None
+                        ),
+                        system_voltage_v=voltage_v,
+                        motor_starting_time_s=motor_starting_time_s,
+                        motor_efficiency_class=motor_efficiency_class,
+                        installation_point_max_short_circuit_ka=(
+                            float(installation_ik_ka)
+                            if installation_ik_ka is not None
+                            else None
+                        ),
+                    )
+            except ValueError:
+                errors.append("变压器及上级系统条件必须填写有效数值。")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="motor.html",
+        context={
+            "form": form,
+            "errors": errors,
+            "catalog_result": catalog_result.to_dict() if catalog_result else None,
+            "load_result": load_result.to_dict() if load_result else None,
+            "voltage_requirement": (
+                voltage_requirement.to_dict() if voltage_requirement else None
+            ),
+            "selection_result": (
+                selection_result.to_dict() if selection_result else None
+            ),
+            "cable_result": cable_result.to_dict() if cable_result else None,
+            "network_result": network_result.to_dict() if network_result else None,
+            "network_recommended_candidate": network_recommended_candidate,
+            "network_recommendation_level": network_recommendation_level,
+            "network_fault_checks_complete": network_fault_checks_complete,
+            "network_thermal_checks_complete": network_thermal_checks_complete,
+            "control_product_result": control_product_result,
+            "cable_configuration_notice": cable_configuration_notice,
+            "motor_catalog_powers_kw": AVAILABLE_RATED_OUTPUT_POWERS_KW,
+            "motor_complete_selection_powers_kw": COMPLETE_SELECTION_POWERS_KW,
+            "motor_parameter_source": motor_parameter_source,
+            "motor_parameter_values": {
+                "efficiency": efficiency,
+                "power_factor": power_factor,
+                "locked_rotor_current_ratio": locked_ratio,
+            },
+        },
     )
 
 

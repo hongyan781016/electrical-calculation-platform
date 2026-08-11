@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "catalog_code": "SIEMENS.SIRIUS.3RA2130.IE3.TYPE2.2023",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "document": "data/references/raw/product-reference/official-web/Siemens_SIRIUS_IC10_Chapter08_2023.pdf",
+    "product_data_document": "data/references/raw/product-reference/official-web/Siemens_SIRIUS_IC10_Chapter07_2023.pdf",
+    "product_manual": "data/references/raw/product-reference/official-web/Siemens_SIRIUS_3RV2_Manual_2015.pdf",
+    "catalog": "Siemens IC 10 · 2023",
+    "reference": "第8章PDF第24页（目录页8/24）及第7章PDF第29页（目录页7/29）"
+  },
+  "conditions": {
+    "starting_method": "DOL",
+    "coordination_type": 2,
+    "iq_ka": 100,
+    "system_voltage_v": 400,
+    "motor_efficiency_classes": ["IE3", "IE4"],
+    "control_supply": "50Hz 230V AC",
+    "terminals": "screw"
+  },
+  "trip_characteristic_reference": {
+    "trip_class": 10,
+    "cold_reference_multiple": 7.2,
+    "cold_minimum_trip_time_s": 4,
+    "cold_maximum_trip_time_s": 10,
+    "operating_temperature_time_factor_approx": 0.25,
+    "trip_time_maximum_deviation_percent_at_or_above_3x": 20,
+    "frequency_scope_hz": [50, 60],
+    "exact_product_curve_available": false,
+    "reference": "3RV2手册PDF第30～32页；第32页明确为示意特性曲线"
+  },
+  "rows": {
+    "30": [
+      {
+        "table_motor_current_a": 55,
+        "setting_min_a": 49,
+        "setting_max_a": 59,
+        "trip_class": 10,
+        "instantaneous_release_a": 845,
+        "standalone_icu_ka_at_400v": 65,
+        "ie3_ie4_starting_current_limit_a": 720,
+        "motor_starter_protector": "3RV2031-4XA10",
+        "contactor": "3RT2037-1AP00",
+        "link_module": "3RA2931-1AA00",
+        "load_feeder_article": "3RA2130-4XA37-0AP0"
+      },
+      {
+        "table_motor_current_a": 55,
+        "setting_min_a": 54,
+        "setting_max_a": 65,
+        "trip_class": 10,
+        "instantaneous_release_a": 845,
+        "standalone_icu_ka_at_400v": 65,
+        "ie3_ie4_starting_current_limit_a": 720,
+        "motor_starter_protector": "3RV2031-4JA10",
+        "contactor": "3RT2037-1AP00",
+        "link_module": "3RA2931-1AA00",
+        "load_feeder_article": "3RA2130-4JA37-0AP0"
+      }
+    ]
+  }
+}
