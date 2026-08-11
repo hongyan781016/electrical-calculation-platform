@@ -22,6 +22,12 @@ data/references/extracted/*
 !data/references/extracted/product-coordination.json
 !data/references/extracted/schneider-easypact-cvs-protection.json
 !data/references/extracted/schneider-easypact-cvs-i2t-curves.json
+!data/references/extracted/schneider-easypact-tvs-type1-motor-coordination.json
+!data/references/extracted/chint-motor-control-products.json
+!data/references/extracted/siemens-ie3-type2-motor-starters.json
+!data/references/extracted/cm3-motor-protection.json
+!data/references/extracted/cm3-63lm-motor-time-current-curve.json
+!data/references/extracted/delixi-cdm3e-electronic-mccb.json
 data/project-samples/
 data/*.dwg
 data/*.bak

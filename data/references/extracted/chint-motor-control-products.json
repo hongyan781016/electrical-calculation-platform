@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "catalog_code": "CHINT.NXC.NXR.2026",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "contactor_source": {
+    "document": "data/references/raw/product-reference/official-web/NXC_Contactor_Catalog_2026-03-20.pdf",
+    "selection_reference": "PDF第3页，003",
+    "technical_reference": "PDF第5页，005"
+  },
+  "overload_source": {
+    "document": "data/references/raw/product-reference/official-web/NXR_Overload_Relay_Catalog_2026-06-10.pdf",
+    "range_reference": "PDF第2页，068",
+    "coordination_reference": "PDF第3页，069",
+    "trip_reference": "PDF第4页，070"
+  },
+  "nxc_ac3_380_400v": [
+    {"model": "NXC-06", "motor_power_kw": 2.2, "rated_current_a": 6},
+    {"model": "NXC-09", "motor_power_kw": 4, "rated_current_a": 9},
+    {"model": "NXC-12", "motor_power_kw": 5.5, "rated_current_a": 12},
+    {"model": "NXC-16", "motor_power_kw": 7.5, "rated_current_a": 16},
+    {"model": "NXC-18", "motor_power_kw": 7.5, "rated_current_a": 18},
+    {"model": "NXC-22", "motor_power_kw": 11, "rated_current_a": 22},
+    {"model": "NXC-25", "motor_power_kw": 11, "rated_current_a": 25},
+    {"model": "NXC-32", "motor_power_kw": 15, "rated_current_a": 32},
+    {"model": "NXC-38", "motor_power_kw": 18.5, "rated_current_a": 38},
+    {"model": "NXC-40", "motor_power_kw": 18.5, "rated_current_a": 40},
+    {"model": "NXC-50", "motor_power_kw": 22, "rated_current_a": 50},
+    {"model": "NXC-65", "motor_power_kw": 30, "rated_current_a": 65},
+    {"model": "NXC-75", "motor_power_kw": 37, "rated_current_a": 75},
+    {"model": "NXC-85", "motor_power_kw": 37, "rated_current_a": 85},
+    {"model": "NXC-100", "motor_power_kw": 45, "rated_current_a": 100}
+  ],
+  "nxr_ranges": [
+    {"frame": "NXR-12", "setting_min_a": 0.1, "setting_max_a": 0.16},
+    {"frame": "NXR-12", "setting_min_a": 0.16, "setting_max_a": 0.25},
+    {"frame": "NXR-12", "setting_min_a": 0.25, "setting_max_a": 0.4},
+    {"frame": "NXR-12", "setting_min_a": 0.4, "setting_max_a": 0.63},
+    {"frame": "NXR-12", "setting_min_a": 0.63, "setting_max_a": 1},
+    {"frame": "NXR-12", "setting_min_a": 1, "setting_max_a": 1.6},
+    {"frame": "NXR-12", "setting_min_a": 1.25, "setting_max_a": 2},
+    {"frame": "NXR-12", "setting_min_a": 1.6, "setting_max_a": 2.5},
+    {"frame": "NXR-12", "setting_min_a": 2.5, "setting_max_a": 4},
+    {"frame": "NXR-12", "setting_min_a": 4, "setting_max_a": 6},
+    {"frame": "NXR-12", "setting_min_a": 5.5, "setting_max_a": 8},
+    {"frame": "NXR-12", "setting_min_a": 7, "setting_max_a": 10},
+    {"frame": "NXR-12", "setting_min_a": 9, "setting_max_a": 12},
+    {"frame": "NXR-25", "setting_min_a": 0.1, "setting_max_a": 0.16},
+    {"frame": "NXR-25", "setting_min_a": 0.16, "setting_max_a": 0.25},
+    {"frame": "NXR-25", "setting_min_a": 0.25, "setting_max_a": 0.4},
+    {"frame": "NXR-25", "setting_min_a": 0.4, "setting_max_a": 0.63},
+    {"frame": "NXR-25", "setting_min_a": 0.63, "setting_max_a": 1},
+    {"frame": "NXR-25", "setting_min_a": 1, "setting_max_a": 1.6},
+    {"frame": "NXR-25", "setting_min_a": 1.25, "setting_max_a": 2},
+    {"frame": "NXR-25", "setting_min_a": 1.6, "setting_max_a": 2.5},
+    {"frame": "NXR-25", "setting_min_a": 2.5, "setting_max_a": 4},
+    {"frame": "NXR-25", "setting_min_a": 4, "setting_max_a": 6},
+    {"frame": "NXR-25", "setting_min_a": 5.5, "setting_max_a": 8},
+    {"frame": "NXR-25", "setting_min_a": 7, "setting_max_a": 10},
+    {"frame": "NXR-25", "setting_min_a": 9, "setting_max_a": 13},
+    {"frame": "NXR-25", "setting_min_a": 12, "setting_max_a": 18},
+    {"frame": "NXR-25", "setting_min_a": 17, "setting_max_a": 25},
+    {"frame": "NXR-38", "setting_min_a": 23, "setting_max_a": 32},
+    {"frame": "NXR-38", "setting_min_a": 30, "setting_max_a": 38},
+    {"frame": "NXR-100", "setting_min_a": 23, "setting_max_a": 32},
+    {"frame": "NXR-100", "setting_min_a": 30, "setting_max_a": 40},
+    {"frame": "NXR-100", "setting_min_a": 37, "setting_max_a": 50},
+    {"frame": "NXR-100", "setting_min_a": 48, "setting_max_a": 65},
+    {"frame": "NXR-100", "setting_min_a": 55, "setting_max_a": 70},
+    {"frame": "NXR-100", "setting_min_a": 63, "setting_max_a": 80},
+    {"frame": "NXR-100", "setting_min_a": 80, "setting_max_a": 93},
+    {"frame": "NXR-100", "setting_min_a": 80, "setting_max_a": 100}
+  ],
+  "nxr_contactor_compatibility": {
+    "NXR-12": ["NXC-06M", "NXC-09M", "NXC-12M"],
+    "NXR-25": ["NXC-06", "NXC-09", "NXC-12", "NXC-16", "NXC-18", "NXC-22", "NXC-25", "NXC-32", "NXC-38"],
+    "NXR-38": ["NXC-25", "NXC-32", "NXC-38"],
+    "NXR-100": ["NXC-40", "NXC-50", "NXC-65", "NXC-75", "NXC-85", "NXC-100"]
+  },
+  "nxr_trip": {
+    "trip_class": "10A",
+    "cold_7_2_setting_current_trip_time_s": [2, 10],
+    "phase_failure_protection": true,
+    "temperature_compensation": true
+  },
+  "type_2_coordination": {
+    "source": {
+      "document": "data/references/raw/product-reference/official-web/CHINT_Industrial_Control_Master_Catalog_2026.pdf",
+      "title": "Motor starter Type II coordination",
+      "fuse_reference": "PDF第190页，印刷第368页",
+      "mccb_reference": "PDF第191页，印刷第370页"
+    },
+    "conditions": {
+      "starting_method": "DOL",
+      "iq_ka": 50,
+      "standard": "IEC 60947-4-1",
+      "motor_efficiency_classes": ["IE1", "IE2"],
+      "system_voltages_v": [380, 400, 415],
+      "frequency_hz": [50, 60]
+    },
+    "rows": {
+      "30": {
+        "table_motor_current_a": 55,
+        "fuse": {"gg_a": 100, "am_a": 63},
+        "mccb": {"family": "NXM-63H", "rated_current_a": 63, "original_cell_has_footnote_marks": true},
+        "contactor": "NXC-65",
+        "overload_relay": {"frame": "NXR-100", "setting_min_a": 48, "setting_max_a": 65}
+      }
+    }
+  },
+  "ns2_standalone": {
+    "source": {
+      "document": "data/references/raw/product-reference/official-web/CHINT_NS2_Motor_Protection_Circuit_Breakers_2026.pdf",
+      "title": "NS2 Series Manual Motor Starters",
+      "operating_reference": "PDF第1页，印刷第299页",
+      "overload_reference": "PDF第2页，印刷第300页",
+      "breaking_reference": "PDF第3页，印刷第301页",
+      "instantaneous_reference": "PDF第4页，印刷第302页"
+    },
+    "status": "verified",
+    "formal_calculation_allowed": false,
+    "conditions": {
+      "rated_operational_voltages_v": [400, 415],
+      "frequency_hz": [50, 60],
+      "utilization_category": "AC-3",
+      "trip_class": "10A",
+      "ambient_temperature_c": [-5, 40],
+      "cold_reference_multiple": 7.2,
+      "cold_minimum_trip_time_s": 2,
+      "cold_maximum_trip_time_s": 10,
+      "instantaneous_no_trip_multiplier": 0.8,
+      "instantaneous_trip_multiplier": 1.2,
+      "instantaneous_test_time_s": 0.2
+    },
+    "time_current_curve_reference": {
+      "document": "data/references/raw/product-reference/official-web/CHINT_NS2_80_Manual_2024.pdf",
+      "reference": "PDF第6页，印刷第04页，Figure 1",
+      "title": "Time-current characteristic curve (20°C)",
+      "curve_1": "Start from cold state, 3 poles",
+      "curve_2": "Start from cold state, 2 poles",
+      "curve_3": "Start from thermal state, 3 poles",
+      "explicit_total_clearing_time": false,
+      "let_through_i2t_available": false,
+      "digitized_for_decision": false
+    },
+    "rows": [
+      {
+        "model": "NS2-80/65",
+        "frame_current_a": 80,
+        "release_rated_current_a": 65,
+        "setting_min_a": 48,
+        "setting_max_a": 65,
+        "instantaneous_release_a": 910,
+        "icu_ka_at_400_415v": 50,
+        "ics_ka_at_400_415v": 17.5,
+        "arcing_distance_mm": 50,
+        "adaptable_contactor_family": "NC8"
+      }
+    ]
+  },
+  "integrated_mpcb_type_2_coordination": {
+    "source": {
+      "document": "data/references/raw/product-reference/official-web/CHINT_Industrial_Control_Master_Catalog_2026.pdf",
+      "title": "MPCB/MCCB + Contactor",
+      "reference": "PDF第193页，印刷第373页"
+    },
+    "conditions": {
+      "starting_method": "DOL",
+      "iq_ka": 50,
+      "standard": "IEC 60947-4-1",
+      "motor_efficiency_classes": ["IE1", "IE2"],
+      "system_voltages_v": [380, 415]
+    },
+    "rows": {
+      "30": {
+        "table_motor_current_a": 55,
+        "mpcb_model": "NS2-80/65",
+        "setting_min_a": 48,
+        "setting_max_a": 65,
+        "instantaneous_pickup_a": 910,
+        "contactor": "NC8-80"
+      }
+    }
+  }
+}

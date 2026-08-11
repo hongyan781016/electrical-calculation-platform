@@ -53,7 +53,7 @@ def test_bv_candidates_start_at_first_corrected_ampacity_match():
     assert candidates[0]["corrected_ampacity_a"] == 50
     assert candidates[0]["ampacity_formal_status"] == PASS
     assert candidates[0]["resolved_electrical"]["voltage_drop_r_ohm_per_km"] > 0
-    assert candidates[0]["resolved_electrical"]["three_phase_r_ohm_per_km"] is None
+    assert candidates[0]["resolved_electrical"]["three_phase_r_ohm_per_km"] > 0
     assert result.status == PASS
 
 

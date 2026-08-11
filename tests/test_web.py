@@ -23,7 +23,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.1.1"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.2.0"}
 
     response = client.post(
         "/projects",
@@ -171,6 +171,406 @@ def test_complete_circuit_page_accepts_user_design_lengths_without_claiming_dwg_
     assert "独立替代设计候选" in response.text
     assert "不代表原图合规" in response.text
     assert "MCCB 通用参数候选" in response.text
+
+
+def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor.db"))
+    client = TestClient(web.app)
+
+    page = client.get("/motor")
+    assert page.status_code == 200
+    assert "三相电动机回路" in page.text
+    assert 'name="known_value"' in page.text
+    assert 'id="motor-catalog-power-selector"' in page.text
+    assert '<option value="30.0" selected>30.0 kW · 完整选型</option>' in page.text
+    assert '<option value="11.0" >11.0 kW · 完整选型</option>' in page.text
+    assert '<option value="200.0" >200.0 kW · 完整选型</option>' in page.text
+    assert 'name="motor_efficiency_percent"' in page.text
+    assert 'name="motor_power_factor"' in page.text
+    assert 'name="starting_frequency"' in page.text
+    assert 'name="bus_load_condition"' in page.text
+    assert 'name="conductor_configuration"' in page.text
+    assert 'name="installation_scenario"' in page.text
+    assert 'name="length_m"' in page.text
+    assert "不填写修正条件时仍显示基础载流量候选" in page.text
+    assert 'name="transformer_family"' in page.text
+    assert 'name="upstream_short_circuit_capacity_mva"' in page.text
+    assert 'name="motor_starting_time_s"' in page.text
+    assert "留空时不执行启动电压近似法" in page.text
+    assert '<option value="scb11" selected>SCB11干式变压器</option>' in page.text
+    assert 'name="transformer_capacity_kva" type="number" min="1" step="1" value="630"' in page.text
+    assert 'name="transformer_uk_percent" type="number" min="0.1" step="0.1" value="6"' in page.text
+    assert 'name="installation_temperature_c" type="number" step="1" value="40"' in page.text
+    assert "当前采用的快速工况" in page.text
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "30",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_3c_3ph_pe",
+            "installation_scenario": "tray",
+            "length_m": "50",
+        },
+    )
+    assert response.status_code == 200
+    assert "系统自动带出的参考参数" in response.text
+    assert "93.6%" in response.text
+    assert "0.84" in response.text
+    assert "7.3 × In" in response.text
+    assert "启动时母线最低电压" in response.text
+    assert "≥ 85.0% Un" in response.text
+    assert "暂不输出产品型号" in response.text
+    assert "电缆基础候选与运行压降" in response.text
+    assert "运行压降" in response.text
+    assert "缺少修正条件" in response.text
+    assert "主保护与控制方案" in response.text
+    assert "NXC-65 / 380～400V AC-3" in response.text
+    assert "NXR-100 55～70 A" in response.text
+    assert "NXR-100 48～65 A" in response.text
+    assert "制造商2类配合正式状态：无法判断" in response.text
+    assert "制造商2类配合暂算：不适用" in response.text
+    assert "该2类配合表只标明IE1/IE2；当前电动机为IE3，不能套用" in response.text
+    assert "gG 100A 或 aM 63A" in response.text
+    assert "NXM-63H系列 / In 63A" in response.text
+    assert "路线A：可调整定MPCB＋接触器" in response.text
+    assert "NS2-80/65（48～65A）＋NC8-80" in response.text
+    assert "正泰NS2独立产品参数核对" in response.text
+    assert "0.8Ii=728.0 A为0.2s不动作试验边界" in response.text
+    assert "1.2Ii=1092.0 A为0.2s内动作试验边界" in response.text
+    assert "380/400V同一应用电压档" in response.text
+    assert "正泰NS2＋NC8制造商2类配合" in response.text
+    assert "单品过载、瞬时和分断参数，与厂家短路条件下的2类配合，是两项不同证据" in response.text
+    assert "IE3/IE4制造商2类配合参考" in response.text
+    assert "3RA2130-4XA37-0AP0" in response.text
+    assert "3RA2130-4JA37-0AP0" in response.text
+    assert "380/400V同一应用电压档" in response.text
+    assert "当前主方案：独立热继电器" in response.text
+    assert "NXR-100 48～65 A" in response.text
+    assert "首选基础截面" in response.text
+    assert "查看其他基础电缆备选" in response.text
+    assert "路线B：短路保护器件＋接触器＋独立热继电器" in response.text
+    assert "不配置独立NXR" in response.text
+
+
+def test_motor_default_form_runs_complete_network_without_professional_inputs(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-default.db"))
+    client = TestClient(web.app)
+
+    response = client.post("/motor", data=web._motor_form_defaults())
+
+    assert response.status_code == 200
+    assert "推荐截面：YJV-0.6/1kV 四芯电缆 25mm²" in response.text
+    assert "当前推荐与采购参数" in response.text
+    assert "YJV-0.6/1kV 3×25＋1×16 mm² 铜芯电缆" in response.text
+    assert "CVS100-MA" in response.text
+    assert "LC1E65" in response.text
+    assert "有条件采用" in response.text
+    assert "采购或调试前必须确认" in response.text
+
+
+def test_motor_11kw_now_uses_exact_type1_coordination_row(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-limited.db"))
+    client = TestClient(web.app)
+    form = web._motor_form_defaults()
+    form["known_value"] = "11"
+
+    response = client.post("/motor", data=form)
+
+    assert response.status_code == 200
+    assert "当前推荐与采购参数" in response.text
+    assert "CVS100-MA" in response.text
+    assert "LC1E25" in response.text
+    assert "LRE22" in response.text
+    assert "额定运行电流" in response.text
+
+
+def test_motor_200kw_page_uses_high_power_catalog_and_exact_type1_devices(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-200kw.db"))
+    client = TestClient(web.app)
+    form = web._motor_form_defaults()
+    form["known_value"] = "200"
+
+    response = client.post("/motor", data=form)
+
+    assert response.status_code == 200
+    assert "1LE1503" in response.text
+    assert "3/20" in response.text
+    assert "PDF第158页" in response.text
+    assert "CVS630-MA" in response.text
+    assert "LC1F400" in response.text
+    assert "LR9-F7379" in response.text
+    assert "当前推荐与采购参数" in response.text
+
+
+def test_motor_page_does_not_interpolate_missing_reference_power(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-missing.db"))
+    client = TestClient(web.app)
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "20",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_3c_3ph_pe",
+            "installation_scenario": "tray",
+            "length_m": "50",
+            "transformer_family": "scb11",
+            "transformer_capacity_kva": "630",
+            "transformer_uk_percent": "6",
+        },
+    )
+    assert response.status_code == 200
+    assert "没有精确参考行" in response.text
+    assert "系统不插值" in response.text
+    assert "补充效率和运行功率因数" in response.text
+    assert "运行电流</strong><small>缺参数" in response.text
+    assert "启动与短路</strong><small>被上游参数阻断" in response.text
+
+
+def test_motor_page_redirects_unsupported_four_core_conduit_to_verified_three_core_path(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-cable-path.db"))
+    client = TestClient(web.app)
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "30",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "no_lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_4c_3ph_n_pe",
+            "installation_scenario": "conduit",
+            "length_m": "50",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "系统已改用有已核实表格的YJV三芯电缆＋独立PE" in response.text
+    assert "首选基础截面：YJV-0.6/1kV 三芯电缆" in response.text
+    assert "没有电缆候选" not in response.text
+    assert "长延时规范关系" in response.text
+    assert "原依据没有给出“接近”的百分比上限" in response.text
+    assert "瞬时整定明确范围" in response.text
+    assert "规范可调范围要求" in response.text
+    assert "所选产品可调范围：</strong>48～65 A" in response.text
+
+
+def test_motor_page_accepts_verified_manual_parameters_when_catalog_has_no_exact_row(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-manual.db"))
+    client = TestClient(web.app)
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "50",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "motor_efficiency_percent": "94",
+            "motor_power_factor": "0.85",
+            "locked_rotor_current_ratio": "7",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "no_lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_3c_3ph_pe",
+            "installation_scenario": "conduit",
+            "length_m": "100",
+            "installation_temperature_c": "35",
+            "enclosed_circuit_count": "1",
+            "transformer_family": "scb11",
+            "transformer_capacity_kva": "630",
+            "transformer_uk_percent": "6",
+            "upstream_short_circuit_capacity_mva": "100",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "用户补充的铭牌或厂家参数" in response.text
+    assert "94.0%" in response.text
+    assert "0.85" in response.text
+    assert "95.078" in response.text
+    assert "推荐电缆完整网络复核" in response.text
+    assert "启动与短路</strong><small>已执行，部分缺参数" in response.text
+    assert "需接入变压器—线路完整网络" not in response.text
+
+
+def test_motor_page_rejects_partial_or_invalid_manual_power_parameters(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-manual-invalid.db"))
+    client = TestClient(web.app)
+
+    partial = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "50",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "motor_efficiency_percent": "94",
+            "motor_power_factor": "",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "no_lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_3c_3ph_pe",
+            "installation_scenario": "conduit",
+            "length_m": "100",
+        },
+    )
+    assert "效率和运行功率因数必须同时填写" in partial.text
+
+    invalid = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "50",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "motor_efficiency_percent": "105",
+            "motor_power_factor": "1.2",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "no_lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_3c_3ph_pe",
+            "installation_scenario": "conduit",
+            "length_m": "100",
+        },
+    )
+    assert "效率必须大于0且不大于100%" in invalid.text
+    assert "运行功率因数必须大于0且不大于1" in invalid.text
+
+
+def test_motor_page_can_recalculate_each_cable_in_complete_network(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-network.db"))
+    client = TestClient(web.app)
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "30",
+            "rated_voltage_v": "380",
+            "poles": "4",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_4c_3ph_n_pe",
+            "installation_scenario": "tray",
+            "length_m": "50",
+            "installation_temperature_c": "40",
+            "tray_layers": "1",
+            "tray_cables_per_layer": "1",
+            "transformer_family": "scb11",
+            "transformer_capacity_kva": "630",
+            "transformer_uk_percent": "6",
+            "upstream_short_circuit_capacity_mva": "100",
+            "preconnected_reactive_load_mvar": "0.1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "推荐电缆完整网络复核" in response.text
+    assert "已形成推荐设计截面" in response.text
+    assert "推荐：YJV-0.6/1kV 四芯电缆 25mm²" in response.text
+    assert "当前推荐与采购参数" in response.text
+    assert "查看计算过程、其他方案和专业校核" in response.text
+    assert response.text.index("当前推荐与采购参数") < response.text.index(
+        "电流与启动要求"
+    )
+    assert "YJV-0.6/1kV 3×25＋1×16 mm² 铜芯电缆" in response.text
+    assert "CVS100-MA" in response.text
+    assert "Irm 900A" in response.text
+    assert "LRE359" in response.text
+    assert "有条件采用" in response.text
+    assert "制造商IEC/EN 60947-4-1、380～415V直接启动1类配合表精确行" in response.text
+    assert "跨品牌组合不等于取得制造商1类/2类配合认证" in response.text
+    assert "正泰：可调整定MPCB＋AC-3接触器" in response.text
+    assert "德力西保护器＋正泰控制器：电子式MCCB短路保护＋AC-3接触器＋独立热继电器" in response.text
+    assert "未成为主方案的原因" in response.text
+    assert "采购或调试前必须确认" in response.text
+    assert "电动机保护型断路器已经承担过载保护时，不重复配置独立热继电器" in response.text
+    assert "专业深化项" in response.text
+    assert "允许整定区间：</strong>57.97～113.0 A" in response.text
+    assert "末端最大三相短路" in response.text
+    assert "末端最小相—PE故障" in response.text
+    assert "相导体允许最长切除" in response.text
+    assert "启动母线/端子电压" in response.text
+    assert "该电缆对应的断路器必须满足" in response.text
+    assert "Icu：≥" in response.text
+    assert "通用参数档位" in response.text
+    assert "不能仅凭瞬时段证明，须查实际反时限曲线" in response.text
+    assert "新版同类产品参考（不是品牌推荐）" in response.text
+    assert "CM3-63L 电动机保护型" in response.text
+    assert "瞬时整定：12In" in response.text
+    assert "曲线采用保守栅格数字化边界" in response.text
+    assert "过载基准：固定In 63.0 A" in response.text
+    assert "产品保证点：1.0In=63.0 A冷态2h内不动作" in response.text
+    assert "与电动机允许过载特性匹配：无法判断" in response.text
+    assert "安装点相间故障" in response.text
+    assert "末端相—PE故障" in response.text
+    assert "综合判定：</strong>通过" in response.text
+    assert "正泰NS2逐电缆候选联动（不是品牌推荐）" in response.text
+    assert "进入保证瞬时动作区：" in response.text
+    assert "NS2完整切除时间校核：无法判断" in response.text
+    assert "未明确为包含触头完全开断的总切除时间" in response.text
+    assert "说明书Figure 1虽提供20℃时间-电流特性曲线" in response.text
+
+
+def test_motor_page_exact_400v_can_render_siemens_ie3_type2_evidence(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "motor-400v.db"))
+    client = TestClient(web.app)
+
+    response = client.post(
+        "/motor",
+        data={
+            "known_basis": "rated_output_power_kw",
+            "known_value": "30",
+            "rated_voltage_v": "400",
+            "poles": "4",
+            "starting_frequency": "infrequent",
+            "bus_load_condition": "lighting_or_sensitive_loads",
+            "conductor_configuration": "yjv_4c_3ph_n_pe",
+            "installation_scenario": "tray",
+            "length_m": "50",
+            "installation_temperature_c": "40",
+            "tray_layers": "1",
+            "tray_cables_per_layer": "1",
+            "transformer_family": "scb11",
+            "transformer_capacity_kva": "630",
+            "transformer_uk_percent": "6",
+            "upstream_short_circuit_capacity_mva": "100",
+            "preconnected_reactive_load_mvar": "0.1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "IE3/IE4制造商2类配合参考" in response.text
+    assert "3RA2130-4XA37-0AP0" in response.text
+    assert "3RA2130-4JA37-0AP0" in response.text
+    assert "不超过表列Iq 100kA" in response.text
+    assert "暂算：通过" in response.text
+    assert "运行压降：无法判断" not in response.text
+    assert "启动电流≤720 A（通过）" in response.text
+    assert "单品Icu 65 kA（通过）" in response.text
+    assert "完整动作曲线与最终配合证据保留在专业复核中" in response.text
+    assert "推荐：YJV-0.6/1kV 四芯电缆 25mm²" in response.text
 
 
 def test_quick_transformer_lv_outlet_short_circuit_lookup(tmp_path, monkeypatch):

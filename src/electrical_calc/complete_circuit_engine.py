@@ -11,6 +11,7 @@ from math import sqrt
 from typing import Any
 
 from .complete_circuit import (
+    CircuitApplication,
     CompleteCircuit,
     InputBasis,
     Phase,
@@ -107,8 +108,17 @@ def _current_from_load(circuit: CompleteCircuit) -> tuple[float | None, str | No
     if load.power_factor is None:
         return None, None
     active_w = load.input_value * multiplier * 1000
+    if load.circuit_application == CircuitApplication.MOTOR_FINAL:
+        if load.efficiency is None:
+            return None, None
+        active_w /= load.efficiency
     if load.phase == Phase.SINGLE:
         return active_w / (voltage * load.power_factor), "Ib＝P/(Ucosφ)"
+    if load.circuit_application == CircuitApplication.MOTOR_FINAL:
+        return (
+            active_w / (sqrt(3) * voltage * load.power_factor),
+            "IrM＝PrM/(√3UrMηrcosφr)",
+        )
     return (
         active_w / (sqrt(3) * voltage * load.power_factor),
         "Ib＝P/(√3Ucosφ)",
@@ -135,6 +145,8 @@ def calculate_complete_circuit_chain(
         "ELEC.SHORT_CIRCUIT",
         "ELEC.EARTH_FAULT.TN.IMPEDANCE",
     ]
+    if data.circuit.load.circuit_application == CircuitApplication.MOTOR_FINAL:
+        rule_codes.append("MOTOR.CURRENT.RATED")
     warnings: list[str] = []
     steps: list[Step] = []
     outputs: dict[str, Any] = {}

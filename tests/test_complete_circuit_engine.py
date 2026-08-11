@@ -41,6 +41,12 @@ def approved_rules():
     }
 
 
+def approved_motor_rules():
+    rules = approved_rules()
+    rules["MOTOR.CURRENT.RATED"] = {"status": "approved"}
+    return rules
+
+
 def circuit(phase=Phase.THREE):
     return CompleteCircuit(
         id="c-1",
@@ -235,6 +241,52 @@ def test_complete_chain_calculates_current_cumulative_drop_and_node_faults():
     )
     assert result.provisional_status == PASS
     assert result.status == PASS
+
+
+def test_motor_running_chain_uses_efficiency_but_not_starting_current():
+    base = calculation_input()
+    motor_load = Load(
+        input_basis=InputBasis.ACTIVE_POWER_KW,
+        input_value=30,
+        phase=Phase.THREE,
+        circuit_application=CircuitApplication.MOTOR_FINAL,
+        load_profile=LoadProfile.MOTOR,
+        duty_characteristic=DutyCharacteristic.HIGH_INRUSH,
+        power_definition=PowerDefinition.CALCULATED,
+        power_factor=0.86,
+        efficiency=0.91,
+    )
+    expected = 30_000 / (sqrt(3) * 380 * 0.91 * 0.86)
+    motor_circuit = CompleteCircuit(
+        **{
+            **base.circuit.__dict__,
+            "load": motor_load,
+        }
+    )
+    terminal_flow = ResolvedSegmentLoadFlow(
+        **{
+            **base.segment_load_flows[-1].__dict__,
+            "design_current_a": expected,
+            "power_factor": 0.86,
+        }
+    )
+    data = CompleteCircuitCalculationInput(
+        **{
+            **base.__dict__,
+            "circuit": motor_circuit,
+            "segment_load_flows": (
+                base.segment_load_flows[0],
+                terminal_flow,
+            ),
+        }
+    )
+
+    result = calculate_complete_circuit_chain(data, approved_motor_rules())
+
+    assert result.status == PASS
+    assert result.outputs["design_current_a"] == pytest.approx(expected, abs=1e-6)
+    assert "MOTOR.CURRENT.RATED" in result.rule_codes
+    assert result.outputs["design_current_a"] < expected * 6.5
 
 
 def test_unapproved_resolved_parameter_keeps_complete_chain_provisional():

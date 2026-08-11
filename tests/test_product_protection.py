@@ -3,6 +3,9 @@ from src.electrical_calc.product_protection import (
     load_easypact_cvs_catalog,
     load_easypact_cvs_i2t_curves,
     select_easypact_cvs_reference,
+    load_easypact_type1_motor_coordination,
+    select_easypact_type1_motor_reference,
+    select_easypact_ma_motor_reference,
 )
 
 
@@ -102,3 +105,42 @@ def test_cvs_product_curve_does_not_extrapolate_or_ignore_icu():
     assert "不外推" in below_curve["reason"]
     assert over_icu["provisional_status"] == "不通过"
     assert "超过所选产品Icu" in over_icu["reason"]
+
+
+def test_type1_motor_coordination_selects_exact_200kw_combination():
+    catalog = load_easypact_type1_motor_coordination()
+    assert catalog["source"]["reference"] == "PDF第38页，印刷页C-5"
+    result = select_easypact_type1_motor_reference(
+        motor_power_kw=200,
+        motor_rated_current_a=358,
+        motor_starting_current_a=2649,
+        system_voltage_v=380,
+        required_icu_ka=13.8,
+        terminal_fault_current_a=7000,
+        phase_permitted_i2t_a2s=1_200_000_000,
+        pe_permitted_i2t_a2s=600_000_000,
+    )
+
+    assert result["breaker_model"] == "CVS630-MA"
+    assert result["contactor_model"] == "LC1F400"
+    assert result["overload_relay_model"] == "LR9-F7379"
+    assert result["overload_range_status"] == "通过"
+    assert result["provisional_status"] == "通过"
+
+
+def test_ma_motor_reference_closes_small_motor_thermal_checks_without_fake_type1():
+    result = select_easypact_ma_motor_reference(
+        motor_rated_current_a=0.72,
+        motor_starting_current_a=3.02,
+        system_voltage_v=380,
+        required_icu_ka=13.8,
+        terminal_fault_current_a=900,
+        phase_permitted_i2t_a2s=800_000,
+        pe_permitted_i2t_a2s=800_000,
+    )
+
+    assert result["breaker_model"] == "CVS100-MA"
+    assert result["ma_rating_a"] == 2.5
+    assert result["magnetic_setting_a"] == 15
+    assert result["coordination_type"] is None
+    assert result["provisional_status"] == "通过"

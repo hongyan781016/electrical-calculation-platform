@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from math import log, pi
 from typing import Any
 
 from .catalog import (
@@ -462,7 +463,11 @@ def _resolved_electrical(
     if voltage_row:
         resolved_reference_ids.append("ELEC.VDROP.IMPEDANCE")
 
-    three_r = three_x = phase_pe_r = phase_pe_x = None
+    # 19DX/手册电压降表列R/X同时可作为同一电缆的正序线路参数；
+    # 相—PE回路仍必须使用对应结构数据，不能把正序电抗直接翻倍代替。
+    three_r = voltage_r
+    three_x = voltage_x
+    phase_pe_r = phase_pe_x = None
     if request.family == "YJV" and request.configuration_code == "yjv_4c_3ph_n_pe":
         sequence = lookup_yjv_four_core_phase_pe_impedance(section)
         if sequence:
@@ -477,6 +482,34 @@ def _resolved_electrical(
             ):
                 phase_pe_r = float(sequence["phase_pe_resistance_ohm_per_km"])
                 phase_pe_x = float(sequence["phase_pe_reactance_ohm_per_km"])
+        elif (
+            request.protective_conductor_mode == "included"
+            and not request.neutral_required
+        ):
+            structure = lookup_yjv_fault_loop_structure(
+                request.configuration_code, section
+            )
+            if structure:
+                pe_section = float(structure["protective_section_mm2"])
+                # 手册9.4.1.1：铜20℃电阻率0.0172、绞入系数1.02；
+                # 手册表4.2-46最小故障计算采用1.5倍电阻。小截面表外
+                # 圆形线芯的回路电抗按9.4.1.2及已核实结构几何计算。
+                phase_pe_r = (
+                    1.5 * 0.0172 * 1.02 * 1000 * (1 / section + 1 / pe_section)
+                )
+                d = float(structure["phase_pe_center_distance_cm"])
+                rp = float(structure["phase_conductor_radius_cm"])
+                re = float(structure["protective_conductor_radius_cm"])
+                phase_l = 2e-4 * log(d / (0.778 * rp))
+                pe_l = 2e-4 * log(d / (0.778 * re))
+                phase_pe_x = 2 * pi * 50 * (phase_l + pe_l)
+                resolved_reference_ids.extend(
+                    [
+                        "ELEC.CABLE.FAULT_LOOP.RESISTANCE",
+                        "ELEC.CABLE.FAULT_LOOP.REACTANCE",
+                        "ELEC.CABLE.YJV.STRUCTURE",
+                    ]
+                )
 
     resolved_reference_ids = list(dict.fromkeys(resolved_reference_ids))
     parameter_status = (

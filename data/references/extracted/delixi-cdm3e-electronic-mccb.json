@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "catalog_code": "DELIXI.CDM3E.2026",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "document": "data/references/raw/product-reference/official-web/DELIXI_CDM3E_Electronic_MCCB_2026.pdf",
+    "title": "德力西电气CDM3E塑壳断路器样本2026.05",
+    "official_url": "https://dlxkeezings.oss-cn-shanghai.aliyuncs.com/2026-05-09/1778289288598-德力西电气CDM3E塑壳断路器样本2026.05.pdf",
+    "overview_reference": "PDF第1页，印刷第189～190页",
+    "technical_reference": "PDF第2页，印刷第191～192页",
+    "curve_reference": "PDF第3页，印刷第193～194页",
+    "setting_reference": "PDF第4页，印刷第195～196页"
+  },
+  "conditions": {
+    "breaking_capacity_table_voltages_v": [400, 415],
+    "protection_types": ["distribution", "motor"],
+    "trip_unit": "LSI(N)",
+    "motor_curve_identified": true,
+    "type_2_coordination_available": false,
+    "short_delay_pickup_tolerance_available": false
+  },
+  "products": [
+    {
+      "model": "CDM3E-125/63",
+      "frame_current_a": 125,
+      "controller_rated_current_a": 63,
+      "poles": [3, 4],
+      "rated_operational_voltages_v": [400, 415, 690],
+      "icu_ka_at_400_415v": 50,
+      "ics_ka_at_400_415v": 50,
+      "icw_ka_1s": 1,
+      "long_delay_settings_a": [32, 36, 40, 45, 50, 56, 60, 63],
+      "long_delay_off_available": true,
+      "short_delay_multipliers": [2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "short_delay_i2t_off": {
+        "delay_settings_s": [0.06, 0.1, 0.2, 0.3, 0.4],
+        "maximum_breaking_times_s": [0.1, 0.14, 0.22, 0.32, 0.5]
+      },
+      "instantaneous_multipliers": [4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "instantaneous_off_available": true,
+      "setting_base_note": "样本写明Ir=OFF时，短路短延时动作电流Isd与Inm匹配；平台暂按本控制器额定电流63A作为Inm，不跨控制器规格。"
+    }
+  ]
+}

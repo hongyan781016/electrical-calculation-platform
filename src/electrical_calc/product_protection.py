@@ -24,6 +24,13 @@ DEFAULT_CVS_I2T_CURVES = (
     / "extracted"
     / "schneider-easypact-cvs-i2t-curves.json"
 )
+DEFAULT_CVS_TVS_TYPE1 = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "references"
+    / "extracted"
+    / "schneider-easypact-tvs-type1-motor-coordination.json"
+)
 
 
 def load_easypact_cvs_catalog(
@@ -40,6 +47,226 @@ def load_easypact_cvs_i2t_curves(
     return json.loads(
         (path or DEFAULT_CVS_I2T_CURVES).read_text(encoding="utf-8")
     )
+
+
+def load_easypact_type1_motor_coordination(
+    path: Path | None = None,
+) -> dict[str, Any]:
+    return json.loads((path or DEFAULT_CVS_TVS_TYPE1).read_text(encoding="utf-8"))
+
+
+def select_easypact_type1_motor_reference(
+    *,
+    motor_power_kw: float,
+    motor_rated_current_a: float,
+    motor_starting_current_a: float,
+    system_voltage_v: float,
+    required_icu_ka: float,
+    terminal_fault_current_a: float,
+    phase_permitted_i2t_a2s: float,
+    pe_permitted_i2t_a2s: float,
+    catalog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Resolve one exact 380–415 V Type-1 DOL combination and its cable checks."""
+
+    data = catalog or load_easypact_type1_motor_coordination()
+    result: dict[str, Any] = {
+        "status": UNKNOWN,
+        "provisional_status": UNKNOWN,
+        "formal_calculation_allowed": bool(data.get("formal_calculation_allowed")),
+        "source": data.get("source", {}),
+    }
+    try:
+        power = float(motor_power_kw)
+        rated = float(motor_rated_current_a)
+        starting = float(motor_starting_current_a)
+        voltage = float(system_voltage_v)
+        required_icu = float(required_icu_ka)
+        terminal_fault = float(terminal_fault_current_a)
+        phase_limit = float(phase_permitted_i2t_a2s)
+        pe_limit = float(pe_permitted_i2t_a2s)
+    except (TypeError, ValueError):
+        result["reason"] = "电动机、短路电流和导体允许热应力必须为有效数值。"
+        return result
+    if not 380 <= voltage <= 415:
+        result["reason"] = "该制造商1类配合表只覆盖380～415V。"
+        return result
+    row = next((item for item in data.get("rows", []) if float(item["power_kw"]) == power), None)
+    if row is None:
+        result["reason"] = "制造商1类配合表没有该功率的精确行；不插值。"
+        return result
+
+    base = load_easypact_cvs_catalog()
+    frame_code = str(row["breaker"]).split("-")[0]
+    frame = next((item for item in base["frames"] if item["frame_code"] == frame_code), None)
+    if frame is None:
+        result["reason"] = "配合表断路器框架未接入EasyPact CVS分断能力表。"
+        return result
+    level = next(
+        ((code, float(icu)) for code, icu in frame["breaking_levels_ka"].items() if float(icu) >= required_icu),
+        None,
+    )
+    if level is None:
+        result["reason"] = "安装点短路电流超过该框架已核实的最大Icu。"
+        result["icu_status"] = FAIL
+        return result
+    level_code, icu = level
+    overload_min, overload_max = (float(v) for v in row["overload_range_a"])
+    table_current = float(
+        row["motor_current_380_a"]
+        if voltage <= 400
+        else row["motor_current_415_a"]
+    )
+    # 功率模式尚无实物铭牌时，制造商配合表本身给出的电动机电流是该
+    # 成套组合的整定依据；计算电流只用于校核，不以小数差异否决表列组合。
+    relay_setting_target = (
+        rated if overload_min <= rated <= overload_max else table_current
+    )
+    current_status = PASS if rated <= float(row["maximum_operational_current_a"]) else FAIL
+    relay_status = PASS if overload_min <= relay_setting_target <= overload_max else FAIL
+    starting_status = PASS if starting < float(row["magnetic_setting_a"]) else FAIL
+    terminal_status = PASS if terminal_fault > float(row["magnetic_setting_a"]) else FAIL
+
+    selected = {
+        "frame_code": frame_code,
+        "performance_level": level_code,
+        "icu_ka": icu,
+    }
+    phase = evaluate_easypact_cvs_phase_thermal_reference(
+        selected, required_icu, phase_limit
+    )
+    phase_status = phase.get("provisional_status", UNKNOWN)
+    pe_i2t = terminal_fault**2 * 0.01 if terminal_status == PASS else None
+    pe_status = (
+        PASS if pe_i2t is not None and pe_i2t <= pe_limit
+        else FAIL if pe_i2t is not None
+        else UNKNOWN
+    )
+    checks = [current_status, relay_status, starting_status, terminal_status, phase_status, pe_status]
+    provisional = FAIL if FAIL in checks else PASS if all(v == PASS for v in checks) else UNKNOWN
+    result.update({
+        "provisional_status": provisional,
+        "manufacturer": data["manufacturer"],
+        "coordination_type": 1,
+        "motor_power_kw": power,
+        "breaker_model": row["breaker"],
+        "frame_code": frame_code,
+        "frame_rating_a": float(frame["frame_rating_a"]),
+        "ma_rating_a": float(row["ma_rating_a"]),
+        "performance_level": level_code,
+        "icu_ka": icu,
+        "ics_ka": icu,
+        "magnetic_setting_multiple": row["magnetic_setting_multiple"],
+        "magnetic_setting_a": float(row["magnetic_setting_a"]),
+        "contactor_model": row["contactor"],
+        "overload_relay_model": row["overload_relay"],
+        "overload_range_a": [overload_min, overload_max],
+        "overload_setting_target_a": relay_setting_target,
+        "coordination_table_motor_current_a": table_current,
+        "motor_current_status": current_status,
+        "overload_range_status": relay_status,
+        "starting_ride_through_status": starting_status,
+        "terminal_magnetic_trip_status": terminal_status,
+        "phase_thermal": phase,
+        "phase_thermal_status": phase_status,
+        "pe_conservative_clearing_time_s": 0.01 if terminal_status == PASS else None,
+        "pe_conservative_i2t_a2s": round(pe_i2t, 3) if pe_i2t is not None else None,
+        "pe_permitted_i2t_a2s": pe_limit,
+        "pe_thermal_status": pe_status,
+        "reason": (
+            "按制造商380～415V直接启动1类配合表精确行选取；相导体采用D-11限流I²t，"
+            "末端相—PE故障超过Irm时按D-9给出的t<10ms作保守暂算。"
+        ),
+    })
+    return result
+
+
+def select_easypact_ma_motor_reference(
+    *,
+    motor_rated_current_a: float,
+    motor_starting_current_a: float,
+    system_voltage_v: float,
+    required_icu_ka: float,
+    terminal_fault_current_a: float,
+    phase_permitted_i2t_a2s: float,
+    pe_permitted_i2t_a2s: float,
+    catalog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Select an exact MA rating where no exact manufacturer starter row exists."""
+
+    data = catalog or load_easypact_cvs_catalog()
+    result: dict[str, Any] = {
+        "status": UNKNOWN,
+        "provisional_status": UNKNOWN,
+        "coordination_type": None,
+        "formal_calculation_allowed": False,
+    }
+    rated = float(motor_rated_current_a)
+    starting = float(motor_starting_current_a)
+    voltage = float(system_voltage_v)
+    required_icu = float(required_icu_ka)
+    terminal_fault = float(terminal_fault_current_a)
+    if rated <= 0 or starting <= 0 or not 380 <= voltage <= 415:
+        result["reason"] = "MA电动机短路保护参考只处理380～415V且电流大于0的回路。"
+        return result
+    ma_row = next(
+        (
+            item for item in data["ma_motor"]["ratings"]
+            if float(item["rating_a"]) >= rated
+            and float(item["setting_multiple"][1]) * float(item["rating_a"])
+            >= 1.2 * starting
+        ),
+        None,
+    )
+    if ma_row is None:
+        result["reason"] = "已核实MA额定档和整定范围不能避开该启动电流。"
+        return result
+    frame = next(item for item in data["frames"] if item["frame_code"] == ma_row["frame_code"])
+    level = next(
+        ((code, float(icu)) for code, icu in frame["breaking_levels_ka"].items() if float(icu) >= required_icu),
+        None,
+    )
+    if level is None:
+        result["reason"] = "安装点短路电流超过该MA框架已核实的Icu。"
+        return result
+    level_code, icu = level
+    ma_rating = float(ma_row["rating_a"])
+    minimum_setting = float(ma_row["setting_multiple"][0]) * ma_rating
+    maximum_setting = float(ma_row["setting_multiple"][1]) * ma_rating
+    setting = max(minimum_setting, 1.2 * starting)
+    terminal_status = PASS if terminal_fault > setting else FAIL
+    selected = {"frame_code": ma_row["frame_code"], "performance_level": level_code, "icu_ka": icu}
+    phase = evaluate_easypact_cvs_phase_thermal_reference(
+        selected, required_icu, float(phase_permitted_i2t_a2s)
+    )
+    phase_status = phase.get("provisional_status", UNKNOWN)
+    pe_i2t = terminal_fault**2 * float(data["ma_motor"]["instantaneous_total_break_time_s"]) if terminal_status == PASS else None
+    pe_status = PASS if pe_i2t is not None and pe_i2t <= float(pe_permitted_i2t_a2s) else FAIL if pe_i2t is not None else UNKNOWN
+    checks = [terminal_status, phase_status, pe_status]
+    provisional = FAIL if FAIL in checks else PASS if all(v == PASS for v in checks) else UNKNOWN
+    result.update({
+        "provisional_status": provisional,
+        "manufacturer": data["manufacturer"],
+        "breaker_model": f"{ma_row['frame_code']}-MA",
+        "frame_code": ma_row["frame_code"],
+        "frame_rating_a": float(frame["frame_rating_a"]),
+        "ma_rating_a": ma_rating,
+        "performance_level": level_code,
+        "icu_ka": icu,
+        "ics_ka": icu,
+        "magnetic_setting_multiple": ma_row["setting_multiple"],
+        "magnetic_setting_a": round(setting, 3),
+        "terminal_magnetic_trip_status": terminal_status,
+        "phase_thermal": phase,
+        "phase_thermal_status": phase_status,
+        "pe_conservative_clearing_time_s": data["ma_motor"]["instantaneous_total_break_time_s"],
+        "pe_conservative_i2t_a2s": round(pe_i2t, 3) if pe_i2t is not None else None,
+        "pe_thermal_status": pe_status,
+        "source_document": data["source"]["document"],
+        "source_references": [data["source"]["ma_reference"], data["source"]["ma_time_current_reference"], data["source"]["energy_limiting_reference"]],
+        "reason": "采用EasyPact CVS MA精确额定档和可调整磁脱扣范围；该路线没有制造商成套配合表，接触器和热继电器须单独校核。",
+    })
+    return result
 
 
 def _interpolate_log_curve(
