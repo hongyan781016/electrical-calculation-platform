@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -104,6 +105,38 @@ class Database:
                     stale INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS project_networks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    input_hash TEXT NOT NULL,
+                    input_json TEXT NOT NULL,
+                    changed_fields_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS network_calculation_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    network_id INTEGER NOT NULL REFERENCES project_networks(id) ON DELETE CASCADE,
+                    network_revision INTEGER NOT NULL,
+                    engine_version TEXT NOT NULL,
+                    task_mode TEXT NOT NULL,
+                    input_snapshot TEXT NOT NULL,
+                    derived_json TEXT NOT NULL,
+                    audit_json TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    rule_snapshot TEXT NOT NULL,
+                    warnings_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    provisional_status TEXT NOT NULL,
+                    stale INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_network_runs_project
+                    ON network_calculation_runs(project_id,id DESC);
+                CREATE INDEX IF NOT EXISTS idx_network_runs_network
+                    ON network_calculation_runs(network_id,network_revision);
                 """
             )
             count = conn.execute("SELECT COUNT(*) FROM reference_rules").fetchone()[0]
@@ -471,5 +504,177 @@ class Database:
                 return None
             data = dict(row)
             for key in ("input_snapshot", "rule_snapshot", "process_json", "result_json", "warnings_json"):
+                data[key] = json.loads(data[key])
+            return data
+
+    @staticmethod
+    def _canonical_json(data: dict[str, Any]) -> str:
+        return json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+    def save_project_network(
+        self, project_id: int, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """保存当前完整回路；内容变化时递增版本并使旧结果过期。"""
+
+        serialized = self._canonical_json(input_data)
+        digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        now = utc_now()
+        with self.connect() as conn:
+            project = conn.execute("SELECT id FROM projects WHERE id=?", (project_id,)).fetchone()
+            if not project:
+                raise ValueError("项目不存在")
+            existing = conn.execute(
+                "SELECT * FROM project_networks WHERE project_id=?", (project_id,)
+            ).fetchone()
+            if existing and existing["input_hash"] == digest:
+                return {
+                    "id": int(existing["id"]),
+                    "revision": int(existing["revision"]),
+                    "changed": False,
+                    "changed_fields": [],
+                }
+
+            changed_fields: list[str] = []
+            if existing:
+                previous = json.loads(existing["input_json"])
+                changed_fields = sorted(
+                    key
+                    for key in set(previous) | set(input_data)
+                    if previous.get(key) != input_data.get(key)
+                )
+                revision = int(existing["revision"]) + 1
+                conn.execute(
+                    """
+                    UPDATE project_networks
+                    SET revision=?,input_hash=?,input_json=?,changed_fields_json=?,updated_at=?
+                    WHERE id=?
+                    """,
+                    (
+                        revision,
+                        digest,
+                        serialized,
+                        json.dumps(changed_fields, ensure_ascii=False),
+                        now,
+                        existing["id"],
+                    ),
+                )
+                conn.execute(
+                    "UPDATE network_calculation_runs SET stale=1 WHERE network_id=?",
+                    (existing["id"],),
+                )
+                network_id = int(existing["id"])
+            else:
+                revision = 1
+                changed_fields = sorted(input_data)
+                cursor = conn.execute(
+                    """
+                    INSERT INTO project_networks
+                    (project_id,revision,input_hash,input_json,changed_fields_json,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?)
+                    """,
+                    (
+                        project_id,
+                        revision,
+                        digest,
+                        serialized,
+                        json.dumps(changed_fields, ensure_ascii=False),
+                        now,
+                        now,
+                    ),
+                )
+                network_id = int(cursor.lastrowid)
+            conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (now, project_id))
+            return {
+                "id": network_id,
+                "revision": revision,
+                "changed": True,
+                "changed_fields": changed_fields,
+            }
+
+    def get_project_network(self, project_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM project_networks WHERE project_id=?", (project_id,)
+            ).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            data["input_json"] = json.loads(data["input_json"])
+            data["changed_fields_json"] = json.loads(data["changed_fields_json"])
+            return data
+
+    def create_network_run(
+        self,
+        project_id: int,
+        network: dict[str, Any],
+        *,
+        engine_version: str,
+        task_mode: str,
+        input_snapshot: dict[str, Any],
+        derived: dict[str, Any],
+        audit_result: dict[str, Any] | None,
+        result: dict[str, Any],
+        rule_snapshot: dict[str, dict[str, Any]],
+    ) -> int:
+        warnings = list(result.get("warnings", []))
+        if audit_result:
+            warnings.extend(audit_result.get("warnings", []))
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO network_calculation_runs
+                (project_id,network_id,network_revision,engine_version,task_mode,input_snapshot,
+                 derived_json,audit_json,result_json,rule_snapshot,warnings_json,status,
+                 provisional_status,stale,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)
+                """,
+                (
+                    project_id,
+                    network["id"],
+                    network["revision"],
+                    engine_version,
+                    task_mode,
+                    self._canonical_json(input_snapshot),
+                    self._canonical_json(derived),
+                    self._canonical_json(audit_result or {}),
+                    self._canonical_json(result),
+                    self._canonical_json(rule_snapshot),
+                    json.dumps(warnings, ensure_ascii=False),
+                    result.get("status", "无法判断"),
+                    result.get("provisional_status", "无法判断"),
+                    utc_now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def list_network_runs(self, project_id: int, limit: int = 100) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM network_calculation_runs
+                WHERE project_id=? ORDER BY id DESC LIMIT ?
+                """,
+                (project_id, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_network_run(self, run_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT r.*,p.code AS project_code,p.name AS project_name
+                FROM network_calculation_runs r
+                JOIN projects p ON p.id=r.project_id
+                WHERE r.id=?
+                """,
+                (run_id,),
+            ).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            for key in (
+                "input_snapshot", "derived_json", "audit_json", "result_json",
+                "rule_snapshot", "warnings_json",
+            ):
                 data[key] = json.loads(data[key])
             return data

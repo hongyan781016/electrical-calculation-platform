@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 import pytest
 
 from src.electrical_calc.database import Database
@@ -23,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.2.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.4.0"}
 
     response = client.post(
         "/projects",
@@ -174,6 +177,68 @@ def test_complete_circuit_page_builds_design_and_audit_from_engineering_inputs(t
     assert "QF0 250A" in audit.text
     assert "原电缆结论" in audit.text
     assert "独立替代主方案" in audit.text
+
+
+def test_complete_circuit_can_be_saved_as_immutable_project_version(tmp_path, monkeypatch):
+    database = Database(tmp_path / "network-project.db")
+    monkeypatch.setattr(web, "db", database)
+    client = TestClient(web.app)
+    project_id = database.create_project("P-004", "完整回路归档")
+
+    preview = client.post("/complete-circuit", data={})
+    assert f'/projects/{project_id}/complete-circuit' in preview.text
+    saved = client.post(
+        f"/projects/{project_id}/complete-circuit",
+        data={},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    assert saved.headers["location"].startswith("/network-runs/")
+
+    run_id = int(saved.headers["location"].rsplit("/", 1)[1])
+    detail = client.get(f"/network-runs/{run_id}")
+    assert detail.status_code == 200
+    assert "保存时的主方案快照" in detail.text
+    assert "完整回路 V1" in detail.text
+    assert database.get_project_network(project_id)["revision"] == 1
+    assert database.get_network_run(run_id)["stale"] == 0
+    pdf = client.get(f"/network-runs/{run_id}/report.pdf")
+    assert pdf.status_code == 200
+    assert pdf.content.startswith(b"%PDF")
+    workbook = client.get(f"/network-runs/{run_id}/export.xlsx")
+    assert workbook.status_code == 200
+    assert workbook.content.startswith(b"PK")
+    exported = load_workbook(BytesIO(workbook.content), data_only=False)
+    assert exported.sheetnames == [
+        "成果总览", "输入与推导", "电缆方案", "保护器件",
+        "逐节点校核", "警告与未闭合项", "依据快照",
+    ]
+    assert exported["成果总览"]["B6"].value == "V1 / #1"
+
+    changed = client.post(
+        f"/projects/{project_id}/complete-circuit",
+        data={"load_value": "45"},
+        follow_redirects=False,
+    )
+    assert changed.status_code == 303
+    assert database.get_project_network(project_id)["revision"] == 2
+    assert database.get_network_run(run_id)["stale"] == 1
+    project = client.get(f"/projects/{project_id}")
+    assert "完整回路版本" in project.text
+    assert "已过期" in project.text
+
+    audit_saved = client.post(
+        f"/projects/{project_id}/complete-circuit",
+        data={"task_mode": "audit"},
+        follow_redirects=False,
+    )
+    audit_run_id = int(audit_saved.headers["location"].rsplit("/", 1)[1])
+    audit_workbook = load_workbook(
+        BytesIO(client.get(f"/network-runs/{audit_run_id}/export.xlsx").content),
+        data_only=False,
+    )
+    assert "原设计核验" in audit_workbook.sheetnames
+    assert audit_workbook["原设计核验"]["A2"].value == "电缆"
 
 
 def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters(tmp_path, monkeypatch):

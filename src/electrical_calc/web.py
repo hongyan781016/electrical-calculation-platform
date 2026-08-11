@@ -69,8 +69,13 @@ from .network_input import (
 )
 from .complete_circuit import InputBasis
 from .radial_circuit_service import calculate_radial_complete_circuit
-from .reports import create_run_pdf
-from .spreadsheets import create_input_template, create_project_export, parse_circuit_workbook
+from .reports import NETWORK_INPUT_LABELS, create_network_run_pdf, create_run_pdf
+from .spreadsheets import (
+    create_input_template,
+    create_network_run_export,
+    create_project_export,
+    parse_circuit_workbook,
+)
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -596,6 +601,7 @@ def complete_circuit_page(request: Request):
             "audit_result": None,
             "alternative_result": None,
             "transformer_capacities": _engineering_transformer_capacities(),
+            "projects": db.list_projects(),
         },
     )
 
@@ -603,6 +609,15 @@ def complete_circuit_page(request: Request):
 @app.post("/complete-circuit", response_class=HTMLResponse)
 async def complete_circuit_preview(request: Request):
     submitted = await request.form()
+    context = _calculate_complete_circuit_context(dict(submitted))
+    return templates.TemplateResponse(
+        request=request,
+        name="circuit_audit.html",
+        context=context,
+    )
+
+
+def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[str, object]:
     form = {
         key: str(submitted.get(key, default)).strip()
         for key, default in _complete_circuit_form_defaults().items()
@@ -719,6 +734,8 @@ async def complete_circuit_preview(request: Request):
         "audit_result": None,
         "alternative_result": None,
         "transformer_capacities": _engineering_transformer_capacities(),
+        "projects": db.list_projects(),
+        "network_input": None,
     }
     if not errors and build_result and build_result.radial_request:
         rules = {item["code"]: item for item in db.list_rules()}
@@ -731,11 +748,8 @@ async def complete_circuit_preview(request: Request):
             build_result.radial_request,
             rules,
         ).to_dict()
-    return templates.TemplateResponse(
-        request=request,
-        name="circuit_audit.html",
-        context=context,
-    )
+        context["network_input"] = network_input
+    return context
 
 
 _ENGINEERING_SEGMENT_LABELS = {
@@ -1430,6 +1444,12 @@ def project_page(request: Request, project_id: int, message: str = ""):
     project = db.get_project(project_id)
     if not project:
         raise HTTPException(404, "项目不存在")
+    network = db.get_project_network(project_id)
+    if network:
+        network["changed_fields_display"] = [
+            NETWORK_INPUT_LABELS.get(field, field)
+            for field in network["changed_fields_json"]
+        ]
     return templates.TemplateResponse(
         request=request,
         name="project.html",
@@ -1437,9 +1457,116 @@ def project_page(request: Request, project_id: int, message: str = ""):
             "project": project,
             "circuits": db.list_circuits(project_id),
             "runs": db.list_runs(project_id),
+            "network": network,
+            "network_runs": db.list_network_runs(project_id),
             "message": message,
         },
     )
+
+
+@app.get("/projects/{project_id}/complete-circuit", response_class=HTMLResponse)
+def project_complete_circuit_page(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+    network = db.get_project_network(project_id)
+    context = _calculate_complete_circuit_context(
+        network["input_json"] if network else _complete_circuit_form_defaults()
+    )
+    context.update({"project": project, "selected_project_id": project_id})
+    return templates.TemplateResponse(
+        request=request, name="circuit_audit.html", context=context
+    )
+
+
+@app.post("/projects/{project_id}/complete-circuit")
+async def save_project_complete_circuit(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+    submitted = dict(await request.form())
+    context = _calculate_complete_circuit_context(submitted)
+    if context["errors"] or not context["alternative_result"]:
+        context.update({"request": request, "project": project, "selected_project_id": project_id})
+        return templates.TemplateResponse(
+            request=request, name="circuit_audit.html", context=context, status_code=422
+        )
+    network = db.save_project_network(project_id, context["form"])
+    rule_codes = _collect_rule_codes(context["alternative_result"])
+    if context["audit_result"]:
+        rule_codes.update(_collect_rule_codes(context["audit_result"]))
+    rules = db.rules_by_code()
+    snapshot = {code: rules[code] for code in sorted(rule_codes) if code in rules}
+    run_id = db.create_network_run(
+        project_id,
+        network,
+        engine_version=__version__,
+        task_mode=context["form"]["task_mode"],
+        input_snapshot=context["form"],
+        derived=context["derived"] or {},
+        audit_result=context["audit_result"],
+        result=context["alternative_result"],
+        rule_snapshot=snapshot,
+    )
+    return RedirectResponse(f"/network-runs/{run_id}", status_code=303)
+
+
+@app.get("/network-runs/{run_id}", response_class=HTMLResponse)
+def network_run_page(request: Request, run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    return templates.TemplateResponse(
+        request=request, name="network_run.html", context={"run": run}
+    )
+
+
+@app.get("/network-runs/{run_id}/report.pdf")
+def export_network_run_pdf(run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    content = create_network_run_pdf(run)
+    filename = (
+        f"{run['project_code']}-{run['input_snapshot'].get('circuit_code', '完整回路')}"
+        f"-V{run['network_revision']}-计算书.pdf"
+    )
+    return Response(
+        content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+@app.get("/network-runs/{run_id}/export.xlsx")
+def export_network_run_excel(run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    content = create_network_run_export(run)
+    filename = (
+        f"{run['project_code']}-{run['input_snapshot'].get('circuit_code', '完整回路')}"
+        f"-V{run['network_revision']}-成果表.xlsx"
+    )
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+def _collect_rule_codes(payload: object) -> set[str]:
+    codes: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key == "rule_codes" and isinstance(value, (list, tuple)):
+                codes.update(str(item) for item in value)
+            else:
+                codes.update(_collect_rule_codes(value))
+    elif isinstance(payload, (list, tuple)):
+        for item in payload:
+            codes.update(_collect_rule_codes(item))
+    return codes
 
 
 @app.post("/projects/{project_id}/circuits")

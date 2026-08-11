@@ -109,5 +109,27 @@
   </section>
   {% endif %}
 </section>
+
+{% if alternative_result %}
+<section class="panel candidate-panel">
+  <div class="section-title"><div><p class="eyebrow">PROJECT ARCHIVE · V0.4</p><h2>保存本次完整回路</h2></div><span class="status-pill pending">生成不可覆盖版本</span></div>
+  {% if projects %}
+  <p class="basis-note">保存后，本次输入、推导值、主方案、原设计核验、警告和依据快照会形成独立版本。修改输入不会覆盖旧版本，只会把旧结果标记为已过期。</p>
+  <form id="network-archive-form" method="post" action="/projects/{{ selected_project_id or projects[0].id }}/complete-circuit" class="stack compact">
+    <label>保存到项目
+      <select id="network-project-select">
+        {% for item in projects %}<option value="{{ item.id }}" {% if selected_project_id == item.id %}selected{% endif %}>{{ item.code }} · {{ item.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% for key, value in form.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <button type="submit">保存并生成计算版本</button>
+  </form>
+  <script>(() => { const form = document.getElementById('network-archive-form'); const project = document.getElementById('network-project-select'); const sync = () => form.action = `/projects/${project.value}/complete-circuit`; project?.addEventListener('change', sync); sync(); })();</script>
+  {% else %}
+  <div class="alert warning"><strong>尚未建立项目</strong><span>请先在项目首页建立项目档案，再回来保存本次完整回路。</span></div>
+  <a class="button secondary" href="/#projects">建立项目</a>
+  {% endif %}
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

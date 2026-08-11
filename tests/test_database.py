@@ -58,6 +58,48 @@ def test_project_circuit_code_is_unique_per_project(tmp_path):
     assert len(database.list_circuits(second)) == 1
 
 
+def test_complete_network_versions_are_immutable_and_stale_on_change(tmp_path):
+    database = Database(tmp_path / "network.db")
+    project_id = database.create_project("P-NET", "完整回路项目")
+    first_input = {"circuit_code": "C-001", "load_value": "30", "length_final": "30"}
+    saved = database.save_project_network(project_id, first_input)
+    assert saved["revision"] == 1
+    assert saved["changed"] is True
+
+    run_id = database.create_network_run(
+        project_id,
+        saved,
+        engine_version="0.4.0",
+        task_mode="design",
+        input_snapshot=first_input,
+        derived={"design_current_a": 50.6},
+        audit_result=None,
+        result={"status": "无法判断", "provisional_status": "通过", "warnings": []},
+        rule_snapshot={},
+    )
+    unchanged = database.save_project_network(project_id, dict(first_input))
+    assert unchanged == {"id": saved["id"], "revision": 1, "changed": False, "changed_fields": []}
+    assert database.get_network_run(run_id)["stale"] == 0
+
+    changed_input = dict(first_input, load_value="45")
+    changed = database.save_project_network(project_id, changed_input)
+    assert changed["revision"] == 2
+    assert changed["changed_fields"] == ["load_value"]
+    assert database.get_network_run(run_id)["stale"] == 1
+    assert database.get_network_run(run_id)["input_snapshot"]["load_value"] == "30"
+    assert database.get_project_network(project_id)["input_json"]["load_value"] == "45"
+
+
+def test_complete_network_is_unique_per_project(tmp_path):
+    database = Database(tmp_path / "network-unique.db")
+    project_id = database.create_project("P-NET", "完整回路项目")
+    first = database.save_project_network(project_id, {"circuit_code": "C-001"})
+    second = database.save_project_network(project_id, {"circuit_code": "C-002"})
+    assert first["id"] == second["id"]
+    assert second["revision"] == 2
+    assert len(database.list_network_runs(project_id)) == 0
+
+
 def test_transformer_lv_short_circuit_rule_is_seeded_idempotently(tmp_path):
     path = tmp_path / "rules.db"
     first = Database(path)

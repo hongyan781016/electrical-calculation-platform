@@ -6,7 +6,8 @@
   <div><p class="eyebrow">{{ project.code }}</p><h1>{{ project.name }}</h1><p>{{ project.description or "未填写项目说明" }}</p></div>
   <div class="actions">
     <a class="button secondary" href="/quick">快速初选</a>
-    <a class="button secondary" href="/projects/{{ project.id }}/export.xlsx">导出 Excel</a>
+    <a class="button" href="/projects/{{ project.id }}/complete-circuit">{{ '打开完整回路' if network else '建立完整回路' }}</a>
+    {% if network_runs %}<a class="button secondary" href="/network-runs/{{ network_runs[0].id }}/export.xlsx">导出当前完整回路</a>{% else %}<a class="button secondary" href="/projects/{{ project.id }}/export.xlsx">导出旧版回路表</a>{% endif %}
     <form method="post" action="/projects/{{ project.id }}/calculate-all"><button type="submit">全部复算</button></form>
   </div>
 </section>
@@ -15,7 +16,17 @@
   <div><span>回路</span><strong>{{ circuits|length }}</strong></div>
   <div><span>计算记录</span><strong>{{ runs|length }}</strong></div>
   <div><span>有效记录</span><strong>{{ runs|rejectattr('stale')|list|length }}</strong></div>
-  <div><span>待完善依据</span><strong>5</strong></div>
+  <div><span>完整回路版本</span><strong>{{ network_runs|length }}</strong></div>
+</section>
+
+<section class="panel candidate-panel">
+  <div class="section-title"><div><p class="eyebrow">COMPLETE CIRCUIT</p><h2>变压器出口至用电设备末端</h2></div>{% if network %}<span class="status-pill pass">当前输入 V{{ network.revision }}</span>{% else %}<span class="status-pill pending">尚未建立</span>{% endif %}</div>
+  {% if network %}
+  <p>当前回路：<strong>{{ network.input_json.circuit_code }} · {{ network.input_json.circuit_name }}</strong>。输入变化后旧计算版本自动标记过期，但不会被覆盖。</p>
+  {% if network.changed_fields_display %}<p class="muted">最近变化字段：{{ network.changed_fields_display|join('、') }}</p>{% endif %}
+  {% else %}<p class="muted">从电源、三段线路到末端负荷建立一个可保存、复算和导出的完整回路。</p>{% endif %}
+  <div class="actions"><a class="button" href="/projects/{{ project.id }}/complete-circuit">{{ '修改并复算' if network else '开始建立' }}</a></div>
+  {% if network_runs %}<div class="run-list">{% for run in network_runs %}<a href="/network-runs/{{ run.id }}" class="run-row {% if run.stale %}stale{% endif %}"><span class="status-dot status-{{ run.status }}"></span><div><strong>完整回路 V{{ run.network_revision }} · {{ '既有核验' if run.task_mode == 'audit' else '快速设计' }}</strong><small>{{ run.created_at }} · 引擎 {{ run.engine_version }}</small></div><span class="tag">{{ '已过期' if run.stale else run.provisional_status }}</span><span>→</span></a>{% endfor %}</div>{% endif %}
 </section>
 
 <div class="workspace-grid">
