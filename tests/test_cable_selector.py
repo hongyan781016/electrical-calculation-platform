@@ -1,8 +1,11 @@
 import pytest
 
 from src.electrical_calc.cable_selector import (
+    COPPER_RESISTIVITY_20C_OHM_MM2_PER_M,
     CableInstallationConditions,
     CableSelectionRequest,
+    MINIMUM_FAULT_RESISTANCE_MULTIPLIER,
+    MULTIWIRE_STRANDING_FACTOR,
     generate_cable_candidates,
 )
 from src.electrical_calc.complete_circuit import Phase
@@ -131,6 +134,55 @@ def test_yjv_four_core_tray_candidate_carries_verified_positive_and_phase_pe_rx(
     assert resolved["phase_pe_r_ohm_per_km"] > 0
     assert resolved["phase_neutral_applicable"] is False
     assert resolved["status"] == "approved"
+
+
+def test_small_four_core_phase_pe_resistance_uses_named_handbook_parameters():
+    request = CableSelectionRequest(
+        segment_id="line-small",
+        family="YJV",
+        configuration_code="yjv_4c_3ph_n_pe",
+        phase=Phase.THREE,
+        system_voltage_v=380,
+        installation_scenario="tray",
+        minimum_required_ampacity_a=10,
+        neutral_required=False,
+        protective_conductor_mode="included",
+        conditions=CableInstallationConditions(
+            temperature_c=40,
+            tray_type="horizontal_perforated",
+            tray_layers=1,
+            tray_cables_per_layer=1,
+        ),
+    )
+    rules = approved_rules() | {
+        "ELEC.CABLE.FAULT_LOOP.RESISTANCE": {"status": "approved"},
+        "ELEC.CABLE.FAULT_LOOP.REACTANCE": {"status": "approved"},
+        "ELEC.CABLE.YJV.STRUCTURE": {"status": "approved"},
+    }
+
+    result = generate_cable_candidates(request, rules)
+    first = next(
+        candidate
+        for candidate in result.outputs["candidates"]
+        if (candidate.get("resolved_electrical") or {}).get("phase_pe_r_ohm_per_km")
+        is not None
+    )
+    phase_section = first["phase_section_mm2"]
+    pe_section = first["protective_section_mm2"]
+    expected = (
+        MINIMUM_FAULT_RESISTANCE_MULTIPLIER
+        * COPPER_RESISTIVITY_20C_OHM_MM2_PER_M
+        * MULTIWIRE_STRANDING_FACTOR
+        * 1000
+        * (1 / phase_section + 1 / pe_section)
+    )
+
+    assert phase_section == 4
+    assert pe_section == 2.5
+    assert first["resolved_electrical"]["phase_pe_r_ohm_per_km"] == pytest.approx(
+        expected
+    )
+    assert first["resolved_electrical"]["status"] == "approved"
 
 
 def test_four_core_cannot_use_same_reduced_core_as_both_n_and_pe():

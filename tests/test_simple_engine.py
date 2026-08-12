@@ -4,7 +4,10 @@ import pytest
 
 from src.electrical_calc.catalog import DEFAULT_CATALOG
 from src.electrical_calc.engine import PASS, UNKNOWN
-from src.electrical_calc.simple_engine import calculate_simple_load_selection
+from src.electrical_calc.simple_engine import (
+    _maximum_voltage_drop_power_factor,
+    calculate_simple_load_selection,
+)
 
 
 def data(**changes):
@@ -255,6 +258,52 @@ def test_voltage_drop_only_needs_length_and_uses_table_parameters():
     assert next(
         stage for stage in result.outputs["workflow_stages"] if stage["code"] == "voltage_drop"
     )["state"] == "completed"
+
+
+@pytest.mark.parametrize(
+    ("resistance", "reactance", "expected"),
+    [
+        (0.398, 0.091, 0.398 / sqrt(0.398**2 + 0.091**2)),
+        (0.01, 1.0, 0.5),
+        (1.0, 0.0, 1.0),
+    ],
+)
+def test_unknown_power_factor_uses_exact_voltage_drop_extreme(
+    resistance, reactance, expected
+):
+    assert _maximum_voltage_drop_power_factor(resistance, reactance) == pytest.approx(
+        expected
+    )
+
+
+def test_unknown_power_factor_voltage_drop_is_not_underestimated_by_discrete_grid():
+    result = calculate_simple_load_selection(
+        data(
+            input_basis="current",
+            input_value=120,
+            power_factor="",
+            length_m=50,
+            load_type_code="electric_heater",
+        ),
+        {},
+    )
+
+    voltage_drop = result.outputs["voltage_drop"]
+    resistance = voltage_drop["resistance_ohm_per_km"]
+    reactance = voltage_drop["reactance_ohm_per_km"]
+    adopted_pf = voltage_drop["adopted_power_factor"]
+    exact_pf = resistance / sqrt(resistance**2 + reactance**2)
+    expected_drop = (
+        sqrt(3)
+        * 120
+        * (resistance * exact_pf + reactance * sqrt(1 - exact_pf**2))
+        * 50
+        / 1000
+    )
+
+    assert adopted_pf == pytest.approx(exact_pf)
+    assert voltage_drop["voltage_drop_v"] == pytest.approx(expected_drop, abs=1e-4)
+    assert "解析极值" in voltage_drop["power_factor_source"]
 
 
 def test_lighting_voltage_drop_uses_table_range_lower_bound_and_increases_section():

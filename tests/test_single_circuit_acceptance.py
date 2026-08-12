@@ -49,7 +49,7 @@ from src.electrical_calc.simple_engine import calculate_simple_load_selection
             45.5803,
             10,
             50,
-            4.5187,
+            4.5221,
         ),
     ],
 )

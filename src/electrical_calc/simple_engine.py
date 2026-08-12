@@ -14,7 +14,42 @@ from .engine import FAIL, Outcome, PASS, Step, UNKNOWN
 from .protective_conductor import calculate_pe_minimum_section_by_table
 
 
-ENGINE_VERSION = "1.16.0"
+ENGINE_VERSION = "1.16.1"
+
+MINIMUM_CONSERVATIVE_POWER_FACTOR = 0.5
+MAXIMUM_CONSERVATIVE_POWER_FACTOR = 1.0
+
+
+def _maximum_voltage_drop_power_factor(
+    resistance_ohm_per_km: float,
+    reactance_ohm_per_km: float,
+    minimum_power_factor: float = MINIMUM_CONSERVATIVE_POWER_FACTOR,
+    maximum_power_factor: float = MAXIMUM_CONSERVATIVE_POWER_FACTOR,
+) -> float:
+    """Return the exact power factor giving the largest R·cosφ + X·sinφ.
+
+    The stationary point is cosφ=R/√(R²+X²).  It is compared with both
+    limits so the result remains correct when the stationary point lies
+    outside the allowed interval.  Voltage-drop catalogue R/X values are
+    non-negative; invalid negative values are rejected instead of silently
+    producing a non-conservative result.
+    """
+    if resistance_ohm_per_km < 0 or reactance_ohm_per_km < 0:
+        raise ValueError("线路R/X不得为负值。")
+    if not 0 < minimum_power_factor <= maximum_power_factor <= 1:
+        raise ValueError("功率因数搜索范围必须满足0＜下限≤上限≤1。")
+
+    candidates = [minimum_power_factor, maximum_power_factor]
+    magnitude = sqrt(resistance_ohm_per_km**2 + reactance_ohm_per_km**2)
+    if magnitude > 0:
+        stationary = resistance_ohm_per_km / magnitude
+        if minimum_power_factor <= stationary <= maximum_power_factor:
+            candidates.append(stationary)
+    return max(
+        candidates,
+        key=lambda pf: resistance_ohm_per_km * pf
+        + reactance_ohm_per_km * sqrt(max(0.0, 1 - pf**2)),
+    )
 
 
 def _number(data: dict[str, Any], key: str) -> float | None:
@@ -1024,10 +1059,8 @@ def _append_voltage_drop(
         reactance = float(impedance_row["reactance_ohm_per_km"])
         candidate_power_factor = power_factor
         if candidate_power_factor is None:
-            candidate_power_factor = max(
-                (0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
-                key=lambda pf: resistance * pf
-                + reactance * sqrt(max(0.0, 1 - pf**2)),
+            candidate_power_factor = _maximum_voltage_drop_power_factor(
+                resistance, reactance
             )
         candidate_sin_phi = sqrt(max(0.0, 1 - candidate_power_factor**2))
         drop_v = phase_factor * current * (
@@ -1082,7 +1115,7 @@ def _append_voltage_drop(
         "reactance_ohm_per_km": reactance,
         "adopted_power_factor": power_factor,
         "power_factor_source": (
-            "未提供功率因数，在表列0.5～1.0范围内取电压降最大值作保守暂算"
+            "未提供功率因数，在表列0.5～1.0范围内按解析极值取电压降最大值作保守暂算"
             if conservative_pf
             else "负荷电流计算采用值 / 用户输入值"
         ),
