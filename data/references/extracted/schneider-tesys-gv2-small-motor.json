@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "catalog_code": "SCHNEIDER.TESYS.GV2.SMALL_MOTOR.TYPE2.400_415V",
+  "manufacturer": "Schneider Electric",
+  "status": "verified",
+  "formal_calculation_allowed": false,
+  "source": {
+    "coordination_document": "https://productinfo.se.com/tesys_island_atex_adaptation_guide/tesys-island-atex-adaptaion-guide/EN/TeSys_Island_ATEX_Adaptation_Guide_DOCA0452EN-00.xml/$/Island_ATEX_MPCBSelection_DD01357952",
+    "coordination_reference": "MPCB Selection，Type 2 Coordination，400/415V表",
+    "gv2me04_document": "data/references/raw/product-reference/official-web/Schneider_GV2ME04_Datasheet_2026.pdf",
+    "gv2me04_reference": "PDF第1页产品参数；PDF第6页热限制曲线",
+    "gv2me05_document": "data/references/raw/product-reference/official-web/Schneider_GV2ME05_Datasheet_2026.pdf",
+    "gv2me05_reference": "PDF第1页产品参数",
+    "earth_loop_document": "https://www.se.com/uk/en/faqs/FA139612/",
+    "earth_loop_reference": "TeSys GV2 Range，GV2ME表"
+  },
+  "conditions": {
+    "system_voltage_min_v": 380,
+    "system_voltage_max_v": 415,
+    "starter_type": "direct_on_line",
+    "coordination_type": 2,
+    "coordination_iq_ka": 100,
+    "contactor": "LC1D09",
+    "pe_fault_maximum_clearing_time_s": 0.4
+  },
+  "rows": [
+    {"power_kw": 0.12, "table_motor_current_a": 0.44, "breaker": "GV2ME04", "setting_min_a": 0.4, "setting_max_a": 0.63, "magnetic_trip_a": 8.0, "magnetic_trip_upper_tolerance_a": 9.6, "maximum_loop_impedance_ohm": 22.76},
+    {"power_kw": 0.18, "table_motor_current_a": 0.6, "breaker": "GV2ME04", "setting_min_a": 0.4, "setting_max_a": 0.63, "magnetic_trip_a": 8.0, "magnetic_trip_upper_tolerance_a": 9.6, "maximum_loop_impedance_ohm": 22.76},
+    {"power_kw": 0.25, "table_motor_current_a": 0.85, "breaker": "GV2ME05", "setting_min_a": 0.63, "setting_max_a": 1.0, "magnetic_trip_a": 13.0, "magnetic_trip_upper_tolerance_a": 15.6, "maximum_loop_impedance_ohm": 14.01}
+  ],
+  "phase_i2t_upper_envelope": {
+    "basis": "GV2ME产品PDF第6页曲线10（1～1.6A）作为GV2ME04/05小电流档的保守上包络；曲线栅格视觉数字化并向较大I²t侧取整",
+    "unit": "A2s",
+    "points": [
+      {"prospective_current_ka": 0.15, "conservative_i2t_a2s": 36000},
+      {"prospective_current_ka": 0.2, "conservative_i2t_a2s": 47000},
+      {"prospective_current_ka": 0.3, "conservative_i2t_a2s": 68000},
+      {"prospective_current_ka": 0.5, "conservative_i2t_a2s": 105000},
+      {"prospective_current_ka": 0.75, "conservative_i2t_a2s": 145000},
+      {"prospective_current_ka": 1.0, "conservative_i2t_a2s": 175000},
+      {"prospective_current_ka": 1.5, "conservative_i2t_a2s": 210000},
+      {"prospective_current_ka": 2.0, "conservative_i2t_a2s": 235000},
+      {"prospective_current_ka": 3.0, "conservative_i2t_a2s": 265000},
+      {"prospective_current_ka": 5.0, "conservative_i2t_a2s": 295000},
+      {"prospective_current_ka": 7.5, "conservative_i2t_a2s": 305000},
+      {"prospective_current_ka": 10.0, "conservative_i2t_a2s": 315000},
+      {"prospective_current_ka": 15.0, "conservative_i2t_a2s": 330000},
+      {"prospective_current_ka": 20.0, "conservative_i2t_a2s": 335000},
+      {"prospective_current_ka": 30.0, "conservative_i2t_a2s": 340000},
+      {"prospective_current_ka": 50.0, "conservative_i2t_a2s": 350000}
+    ]
+  }
+}

@@ -335,6 +335,13 @@ def test_handbook_approximation_does_not_require_locked_rotor_power_factor():
     )
     assert result.outputs["motor_starting_current_ka"] > 0
     assert any("近似计算" in warning for warning in result.warnings)
+    assert result.outputs["motor_terminal_torque_check"] == UNKNOWN
+    assert result.outputs["voltage_reference"] == {
+        "source_bus_voltage_pu": 1.05,
+        "system_average_voltage_kv": 0.4,
+        "nominal_network_voltage_kv": 0.38,
+    }
+    assert any("负载阻转矩" in warning for warning in result.warnings)
 
 
 def test_handbook_approximation_with_zero_feeder_reactance_has_equal_terminal_voltage():

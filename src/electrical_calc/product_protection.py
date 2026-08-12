@@ -31,6 +31,13 @@ DEFAULT_CVS_TVS_TYPE1 = (
     / "extracted"
     / "schneider-easypact-tvs-type1-motor-coordination.json"
 )
+DEFAULT_TESYS_GV2_SMALL_MOTOR = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "references"
+    / "extracted"
+    / "schneider-tesys-gv2-small-motor.json"
+)
 
 
 def load_easypact_cvs_catalog(
@@ -53,6 +60,151 @@ def load_easypact_type1_motor_coordination(
     path: Path | None = None,
 ) -> dict[str, Any]:
     return json.loads((path or DEFAULT_CVS_TVS_TYPE1).read_text(encoding="utf-8"))
+
+
+def load_tesys_gv2_small_motor_catalog(
+    path: Path | None = None,
+) -> dict[str, Any]:
+    return json.loads(
+        (path or DEFAULT_TESYS_GV2_SMALL_MOTOR).read_text(encoding="utf-8")
+    )
+
+
+def select_tesys_gv2_small_motor_reference(
+    *,
+    motor_power_kw: float,
+    motor_rated_current_a: float,
+    motor_starting_current_a: float,
+    system_voltage_v: float,
+    required_icu_ka: float,
+    terminal_fault_current_a: float,
+    phase_permitted_i2t_a2s: float,
+    pe_permitted_i2t_a2s: float,
+    catalog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Resolve the verified 0.12-0.25 kW TeSys GV2 Type-2 rows."""
+
+    data = catalog or load_tesys_gv2_small_motor_catalog()
+    result: dict[str, Any] = {
+        "status": UNKNOWN,
+        "provisional_status": UNKNOWN,
+        "formal_calculation_allowed": bool(data.get("formal_calculation_allowed")),
+        "source": data.get("source", {}),
+    }
+    power = float(motor_power_kw)
+    rated = float(motor_rated_current_a)
+    starting = float(motor_starting_current_a)
+    voltage = float(system_voltage_v)
+    required_icu = float(required_icu_ka)
+    terminal_fault = float(terminal_fault_current_a)
+    phase_limit = float(phase_permitted_i2t_a2s)
+    pe_limit = float(pe_permitted_i2t_a2s)
+    conditions = data["conditions"]
+    if not conditions["system_voltage_min_v"] <= voltage <= conditions["system_voltage_max_v"]:
+        result["reason"] = "该GV2成套配合表只覆盖380～415V应用电压档。"
+        return result
+    row = next(
+        (item for item in data["rows"] if float(item["power_kw"]) == power),
+        None,
+    )
+    if row is None:
+        result["reason"] = "GV2小功率成套配合表没有该功率精确行；不插值。"
+        return result
+
+    current_status = (
+        PASS if float(row["setting_min_a"]) <= rated <= float(row["setting_max_a"])
+        else FAIL
+    )
+    starting_status = (
+        PASS if starting < float(row["magnetic_trip_a"]) else FAIL
+    )
+    icu_status = (
+        PASS if required_icu <= float(conditions["coordination_iq_ka"]) else FAIL
+    )
+    terminal_status = (
+        PASS if terminal_fault >= float(row["magnetic_trip_upper_tolerance_a"])
+        else FAIL
+    )
+    phase_i2t = _interpolate_log_curve(
+        data["phase_i2t_upper_envelope"]["points"], required_icu
+    )
+    # The manufacturer curve is raster-only.  A visually digitised upper
+    # envelope must not approve a conductor when the apparent margin is within
+    # the reading uncertainty.  Keep at least 5% headroom for a PASS.
+    phase_margin_ratio = (
+        phase_limit / phase_i2t - 1.0
+        if phase_i2t is not None and phase_i2t > 0
+        else None
+    )
+    phase_status = (
+        FAIL
+        if phase_i2t is not None and phase_i2t > phase_limit
+        else PASS
+        if phase_margin_ratio is not None and phase_margin_ratio >= 0.05
+        else UNKNOWN
+    )
+    pe_i2t = (
+        terminal_fault**2 * float(conditions["pe_fault_maximum_clearing_time_s"])
+        if terminal_status == PASS
+        else None
+    )
+    pe_status = (
+        PASS if pe_i2t is not None and pe_i2t <= pe_limit
+        else FAIL if pe_i2t is not None
+        else UNKNOWN
+    )
+    checks = [
+        current_status,
+        starting_status,
+        icu_status,
+        terminal_status,
+        phase_status,
+        pe_status,
+    ]
+    provisional = (
+        FAIL if FAIL in checks else PASS if all(value == PASS for value in checks) else UNKNOWN
+    )
+    result.update(
+        {
+            "provisional_status": provisional,
+            "manufacturer": data["manufacturer"],
+            "coordination_type": conditions["coordination_type"],
+            "coordination_iq_ka": float(conditions["coordination_iq_ka"]),
+            "motor_power_kw": power,
+            "breaker_model": row["breaker"],
+            "setting_min_a": float(row["setting_min_a"]),
+            "setting_max_a": float(row["setting_max_a"]),
+            "setting_target_a": rated,
+            "magnetic_trip_a": float(row["magnetic_trip_a"]),
+            "magnetic_trip_upper_tolerance_a": float(
+                row["magnetic_trip_upper_tolerance_a"]
+            ),
+            "contactor_model": conditions["contactor"],
+            "motor_current_status": current_status,
+            "starting_ride_through_status": starting_status,
+            "icu_status": icu_status,
+            "terminal_magnetic_trip_status": terminal_status,
+            "phase_conservative_i2t_a2s": phase_i2t,
+            "phase_permitted_i2t_a2s": phase_limit,
+            "phase_i2t_margin_percent": (
+                round(phase_margin_ratio * 100.0, 3)
+                if phase_margin_ratio is not None
+                else None
+            ),
+            "phase_thermal_status": phase_status,
+            "pe_conservative_clearing_time_s": float(
+                conditions["pe_fault_maximum_clearing_time_s"]
+            ),
+            "pe_conservative_i2t_a2s": round(pe_i2t, 3) if pe_i2t is not None else None,
+            "pe_permitted_i2t_a2s": pe_limit,
+            "pe_thermal_status": pe_status,
+            "reason": (
+                "按制造商400/415V直接启动2类配合精确行选取；380V按既定同一应用电压档处理。"
+                "相导体采用GV2ME热限制图的保守上包络，PE按制造商相—PE回路0.4s表列边界复核。"
+            ),
+        }
+    )
+    return result
 
 
 def select_easypact_type1_motor_reference(
