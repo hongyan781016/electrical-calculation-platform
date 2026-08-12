@@ -26,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.4.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.4.1"}
 
     response = client.post(
         "/projects",

@@ -25,6 +25,15 @@ from .engine import Outcome, PASS, Step, UNKNOWN
 
 ENGINE_VERSION = "0.1.0"
 
+# 《工业与民用供配电设计手册（第四版）》9.4.1.1：铜20℃电阻率；
+# 多股导体绞入系数取1.02。表4.2-46规定的低压最小故障计算采用
+# 1.5倍电阻。9.4.1.2使用0.778r作为导体几何平均半径。
+COPPER_RESISTIVITY_20C_OHM_MM2_PER_M = 0.0172
+MULTIWIRE_STRANDING_FACTOR = 1.02
+MINIMUM_FAULT_RESISTANCE_MULTIPLIER = 1.5
+GEOMETRIC_MEAN_RADIUS_FACTOR = 0.778
+CONDUCTOR_INDUCTANCE_COEFFICIENT_H_PER_KM = 2e-4
+
 
 @dataclass(frozen=True)
 class CableInstallationConditions:
@@ -491,17 +500,22 @@ def _resolved_electrical(
             )
             if structure:
                 pe_section = float(structure["protective_section_mm2"])
-                # 手册9.4.1.1：铜20℃电阻率0.0172、绞入系数1.02；
-                # 手册表4.2-46最小故障计算采用1.5倍电阻。小截面表外
-                # 圆形线芯的回路电抗按9.4.1.2及已核实结构几何计算。
                 phase_pe_r = (
-                    1.5 * 0.0172 * 1.02 * 1000 * (1 / section + 1 / pe_section)
+                    MINIMUM_FAULT_RESISTANCE_MULTIPLIER
+                    * COPPER_RESISTIVITY_20C_OHM_MM2_PER_M
+                    * MULTIWIRE_STRANDING_FACTOR
+                    * 1000
+                    * (1 / section + 1 / pe_section)
                 )
                 d = float(structure["phase_pe_center_distance_cm"])
                 rp = float(structure["phase_conductor_radius_cm"])
                 re = float(structure["protective_conductor_radius_cm"])
-                phase_l = 2e-4 * log(d / (0.778 * rp))
-                pe_l = 2e-4 * log(d / (0.778 * re))
+                phase_l = CONDUCTOR_INDUCTANCE_COEFFICIENT_H_PER_KM * log(
+                    d / (GEOMETRIC_MEAN_RADIUS_FACTOR * rp)
+                )
+                pe_l = CONDUCTOR_INDUCTANCE_COEFFICIENT_H_PER_KM * log(
+                    d / (GEOMETRIC_MEAN_RADIUS_FACTOR * re)
+                )
                 phase_pe_x = 2 * pi * 50 * (phase_l + pe_l)
                 resolved_reference_ids.extend(
                     [
