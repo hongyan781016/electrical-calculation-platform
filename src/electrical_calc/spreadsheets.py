@@ -10,6 +10,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from .reports import NETWORK_SEGMENT_LABELS, network_derived_rows, network_input_rows
+
 
 HEADERS = [
     ("回路编号", "code", True, "文本，项目内唯一"),
@@ -283,6 +285,133 @@ def create_project_export(
     _format_table(rule_ws, len(rule_headers))
     rule_ws.column_dimensions["G"].width = 60
     for row in rule_ws.iter_rows(min_row=2):
+        row[6].alignment = Alignment(wrap_text=True, vertical="top")
+
+    stream = BytesIO()
+    wb.save(stream)
+    return stream.getvalue()
+
+
+def create_network_run_export(run: dict[str, Any]) -> bytes:
+    """从完整回路版本快照生成成果表，不在导出阶段重新计算。"""
+
+    wb = Workbook()
+    summary = wb.active
+    summary.title = "成果总览"
+    input_data = run["input_snapshot"]
+    result = run["result_json"]
+    outputs = result.get("outputs", {})
+    choices = outputs.get("viable_combinations") or outputs.get("incomplete_combinations") or []
+    choice = choices[0] if choices else {}
+    chain = choice.get("chain_result", {}).get("outputs", {})
+    _style_title(
+        summary,
+        4,
+        f"{run['project_name']} - 完整低压回路成果",
+        "本文件来自不可覆盖的计算版本快照；未批准依据的暂算结果不能作为正式设计结论。",
+    )
+    summary.append([])
+    summary.append(["项目编号", run["project_code"], "项目名称", run["project_name"]])
+    summary.append(["回路编号", input_data.get("circuit_code"), "回路名称", input_data.get("circuit_name")])
+    summary.append(["计算版本", f"V{run['network_revision']} / #{run['id']}", "任务", "既有核验" if run["task_mode"] == "audit" else "快速设计"])
+    summary.append(["正式状态", run["status"], "暂算状态", run["provisional_status"]])
+    summary.append(["是否过期", "是" if run["stale"] else "否", "引擎版本", run["engine_version"]])
+    summary.append(["计算时间", run["created_at"], "输入快照", "已冻结"])
+    for row in range(4, 10):
+        summary.cell(row, 1).font = Font(bold=True, color=NAVY)
+        summary.cell(row, 3).font = Font(bold=True, color=NAVY)
+    summary.sheet_view.showGridLines = False
+    _fit_columns(summary, [18, 34, 18, 34])
+
+    inputs = wb.create_sheet("输入与推导")
+    inputs.append(["类别", "字段", "值"])
+    for label, value in network_input_rows(input_data):
+        inputs.append(["用户输入", label, value])
+    for label, value in network_derived_rows(run["derived_json"]):
+        display_value = (
+            json.dumps(value, ensure_ascii=False)
+            if isinstance(value, (dict, list, tuple))
+            else value
+        )
+        inputs.append(["系统推导", label, display_value])
+    _format_table(inputs, 3)
+    _fit_columns(inputs, [16, 40, 42])
+
+    cables = wb.create_sheet("电缆方案")
+    cables.append(["线路段", "电缆规格", "计算电流Ib(A)", "修正载流量Iz(A)", "状态"])
+    for cable in choice.get("cables", []):
+        cables.append([
+            NETWORK_SEGMENT_LABELS.get(
+                str(cable.get("candidate_id", "")).split(":")[0],
+                str(cable.get("candidate_id", "")).split(":")[0],
+            ),
+            cable.get("cable_specification"),
+            cable.get("minimum_required_ampacity_a"),
+            cable.get("corrected_ampacity_a"),
+            cable.get("provisional_status", ""),
+        ])
+    _format_table(cables, 5)
+    _fit_columns(cables, [22, 42, 20, 22, 16])
+
+    breakers = wb.create_sheet("保护器件")
+    breakers.append(["序号", "类别", "额定电流In(A)", "壳架电流(A)", "额定电压Ue(V)", "分断能力Icu(kA)", "状态"])
+    for index, breaker in enumerate(choice.get("breakers", []), 1):
+        breakers.append([
+            index, breaker.get("family"), breaker.get("rated_current_a"),
+            breaker.get("frame_current_a"), breaker.get("rated_voltage_v"),
+            breaker.get("selected_icu_ka"), breaker.get("provisional_status"),
+        ])
+    _format_table(breakers, 7)
+    _fit_columns(breakers, [10, 18, 20, 20, 20, 22, 16])
+
+    audit_outputs = run.get("audit_json", {}).get("outputs", {})
+    if audit_outputs:
+        audit = wb.create_sheet("原设计核验")
+        audit.append(["对象", "线路段", "原规格/标识", "结论"])
+        for cable in audit_outputs.get("installed_cables", []):
+            audit.append([
+                "电缆", NETWORK_SEGMENT_LABELS.get(cable.get("segment_id"), cable.get("segment_id")),
+                cable.get("designation"),
+                cable.get("status", cable.get("reason", "无法判断")),
+            ])
+        for breaker in audit_outputs.get("installed_breakers", []):
+            audit.append([
+                "断路器", "", breaker.get("designation"), breaker.get("status", "无法判断"),
+            ])
+        _format_table(audit, 4)
+        _fit_columns(audit, [16, 20, 48, 20])
+
+    nodes = wb.create_sheet("逐节点校核")
+    nodes.append(["节点", "累计压降(%)", "最大三相短路(kA)", "最小相-PE故障(A)"])
+    for node in chain.get("node_results", []):
+        nodes.append([
+            node.get("node_name"), node.get("cumulative_voltage_drop_percent"),
+            node.get("three_phase_short_circuit_ka"), node.get("earth_fault_current_a"),
+        ])
+    _format_table(nodes, 4)
+    _fit_columns(nodes, [34, 22, 24, 25])
+
+    warnings = wb.create_sheet("警告与未闭合项")
+    warnings.append(["类型", "内容"])
+    for warning in run.get("warnings_json", []):
+        warnings.append(["计算警告", warning])
+    for item in choice.get("missing_items", []):
+        warnings.append(["未闭合项", item])
+    _format_table(warnings, 2)
+    _fit_columns(warnings, [18, 90])
+    for row in warnings.iter_rows(min_row=2):
+        row[1].alignment = Alignment(wrap_text=True, vertical="top")
+
+    rules = wb.create_sheet("依据快照")
+    rules.append(["依据编号", "名称", "状态", "文件", "条文/表号", "页码", "原文"])
+    for code, rule in run["rule_snapshot"].items():
+        rules.append([
+            code, rule.get("name"), rule.get("status"), rule.get("document_name"),
+            rule.get("clause_no"), rule.get("page_no"), rule.get("original_text"),
+        ])
+    _format_table(rules, 7)
+    _fit_columns(rules, [34, 28, 14, 38, 24, 24, 90])
+    for row in rules.iter_rows(min_row=2):
         row[6].alignment = Alignment(wrap_text=True, vertical="top")
 
     stream = BytesIO()

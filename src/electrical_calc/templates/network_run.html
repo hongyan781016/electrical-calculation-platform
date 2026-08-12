@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}完整回路版本 #{{ run.id }} · 电气计算台{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="/">项目</a><span>/</span><a href="/projects/{{ run.project_id }}">{{ run.project_code }}</a><span>/</span><strong>完整回路 V{{ run.network_revision }}</strong></nav>
+
+<section class="project-head">
+  <div><p class="eyebrow">COMPLETE CIRCUIT VERSION #{{ run.id }}</p><h1>{{ run.input_snapshot.circuit_name }}</h1><p>{{ run.input_snapshot.circuit_code }} · {{ run.created_at }} · 引擎 {{ run.engine_version }}</p></div>
+  <div class="actions">
+    <a class="button secondary" href="/projects/{{ run.project_id }}/complete-circuit">打开当前回路</a>
+    <a class="button secondary" href="/network-runs/{{ run.id }}/report.pdf">导出 PDF</a>
+    <a class="button secondary" href="/network-runs/{{ run.id }}/export.xlsx">导出 Excel</a>
+  </div>
+</section>
+
+{% if run.stale %}<div class="alert danger"><strong>此版本已过期</strong><span>项目当前输入已发生变化。本记录保留原输入与原结果，仅供追溯。</span></div>{% endif %}
+{% if run.status != '通过' %}<div class="alert warning"><strong>正式状态：{{ run.status }}</strong><span>暂算状态：{{ run.provisional_status }}。未批准规则不能形成正式结论。</span></div>{% endif %}
+
+<section class="metrics">
+  <div><span>网络修订</span><strong>V{{ run.network_revision }}</strong></div>
+  <div><span>任务</span><strong>{{ '既有核验' if run.task_mode == 'audit' else '快速设计' }}</strong></div>
+  <div><span>计算电流</span><strong>{{ run.derived_json.design_current_a|round(3) }} A</strong></div>
+  <div><span>版本状态</span><strong>{{ '已过期' if run.stale else run.provisional_status }}</strong></div>
+</section>
+
+{% set outputs = run.result_json.outputs %}
+{% set viable = outputs.viable_combinations or [] %}
+{% set incomplete = outputs.incomplete_combinations or [] %}
+{% set choices = viable if viable else incomplete %}
+<div class="detail-grid">
+  <section>
+    <div class="section-title"><div><p class="eyebrow">PRIMARY DESIGN</p><h2>保存时的主方案快照</h2></div></div>
+    {% if choices %}{% set choice = choices[0] %}
+      <h3>电缆</h3>
+      <div class="selection-grid">{% for cable in choice.cables %}<article class="selection-card"><h3>{{ cable.candidate_id.split(':')[0] }}</h3><p>{{ cable.cable_specification }}</p><p>Ib {{ cable.minimum_required_ampacity_a|round(2) }} A；Iz {{ cable.corrected_ampacity_a|round(2) }} A</p></article>{% endfor %}</div>
+      <h3>保护器件参数</h3>
+      <div class="selection-grid">{% for breaker in choice.breakers %}<article class="selection-card"><h3>{{ breaker.family }} · {{ breaker.rated_current_a }} A</h3><p>壳架 {{ breaker.frame_current_a }} A；Ue {{ breaker.rated_voltage_v }} V；Icu {{ breaker.selected_icu_ka }} kA</p><p>{{ breaker.provisional_status }}</p></article>{% endfor %}</div>
+      {% if choice.chain_result.outputs.node_results %}<h3>逐节点结果</h3><div class="selection-grid">{% for node in choice.chain_result.outputs.node_results %}<article class="selection-card"><h3>{{ node.node_name }}</h3><p>累计压降 {{ node.cumulative_voltage_drop_percent|round(4) }}%</p><p>最大三相短路 {{ node.three_phase_short_circuit_ka|round(4) if node.three_phase_short_circuit_ka is not none else '—' }} kA</p><p>最小相-PE故障 {{ node.earth_fault_current_a|round(2) if node.earth_fault_current_a is not none else '无法判断' }} A</p></article>{% endfor %}</div>{% endif %}
+      {% if choice.missing_items %}<div class="alert warning"><strong>保存时仍未闭合</strong><ul>{% for item in choice.missing_items %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+    {% else %}<div class="empty"><strong>没有形成主方案</strong><p>详见警告快照。</p></div>{% endif %}
+
+    {% if run.audit_json %}<div class="section-title"><div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原设计核验快照</h2></div><span class="tag">{{ run.audit_json.provisional_status }}</span></div><p class="basis-note">原设计核验与替代主方案分别保存，互不覆盖。</p>{% endif %}
+  </section>
+  <aside class="side-stack">
+    <section class="panel"><p class="eyebrow">INPUT SNAPSHOT</p><h2>输入快照</h2><dl class="kv">{% for key, value in run.input_snapshot.items() %}<div><dt>{{ key }}</dt><dd>{{ value or '—' }}</dd></div>{% endfor %}</dl></section>
+    <section class="panel"><p class="eyebrow">WARNINGS</p><h2>警告快照</h2><ul class="warning-list">{% for warning in run.warnings_json %}<li>{{ warning }}</li>{% else %}<li class="ok">没有警告。</li>{% endfor %}</ul></section>
+    <section class="panel"><p class="eyebrow">RULE SNAPSHOT</p><h2>依据快照</h2>{% for code, rule in run.rule_snapshot.items() %}<div class="rule-mini"><div><strong>{{ code }}</strong><span class="tag">{{ rule.status }}</span></div><p>{{ rule.document_name or '未提供文件' }} · {{ rule.clause_no or '未提供条文号' }} · {{ rule.page_no or '未提供页码' }}</p></div>{% else %}<p class="muted">本结果未返回可识别的依据编号。</p>{% endfor %}</section>
+  </aside>
+</div>
+{% endblock %}

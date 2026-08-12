@@ -67,10 +67,19 @@ from .network_input import (
     TerminalLoadKind,
     build_circuit_network_requests,
 )
-from .complete_circuit import InputBasis
+from .complete_circuit import InputBasis, Phase
+from .pole_configuration import (
+    PoleAndNeutralInput,
+    evaluate_pole_and_neutral_configuration,
+)
 from .radial_circuit_service import calculate_radial_complete_circuit
-from .reports import create_run_pdf
-from .spreadsheets import create_input_template, create_project_export, parse_circuit_workbook
+from .reports import NETWORK_INPUT_LABELS, create_network_run_pdf, create_run_pdf
+from .spreadsheets import (
+    create_input_template,
+    create_network_run_export,
+    create_project_export,
+    parse_circuit_workbook,
+)
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -581,6 +590,91 @@ def _derive_nominal_line_to_earth_voltage(
     return "", "相制或电压未能形成U0。"
 
 
+def _preferred_quick_breaker_candidate(result: dict[str, object]) -> dict[str, object]:
+    candidates = result.get("outputs", {}).get("breaker_design_candidates", [])
+    usable = [
+        item for item in candidates if item.get("selected_icu_ka") is not None
+    ]
+    if not usable:
+        usable = list(candidates)
+    return min(
+        usable,
+        key=lambda item: (
+            float(item.get("rated_current_a") or float("inf")),
+            0 if item.get("family_code") == "MCB" else 1,
+        ),
+        default={},
+    )
+
+
+def _quick_pole_configuration(
+    form: dict[str, str],
+    breaker: dict[str, object],
+    rules: dict[str, dict[str, object]],
+) -> dict[str, object] | None:
+    if not breaker:
+        return None
+    phase = Phase.SINGLE if form.get("phase") == "1" else Phase.THREE
+    configuration = form.get("conductor_configuration", "")
+    neutral_required = configuration in {
+        "bv_1ph_2wire_pe",
+        "bv_3ph_4wire_pe",
+        "yjv_5c_3ph_n_pe",
+    }
+    rcd_required = form.get("rcd_scenario") not in {"", "unknown"}
+    if phase == Phase.SINGLE:
+        selected_poles = "2P" if rcd_required else "1P+N"
+        neutral_mode = "switched_unprotected"
+    elif neutral_required and rcd_required:
+        selected_poles = "4P"
+        neutral_mode = "switched_unprotected"
+    else:
+        selected_poles = "3P"
+        neutral_mode = "not_switched" if neutral_required else "absent"
+
+    earthing_system = form.get("earthing_system")
+    if earthing_system == "TN-S":
+        pen_present: bool | None = False
+    elif earthing_system == "TN-C-S" and rcd_required:
+        pen_present = False
+    else:
+        pen_present = None
+    outcome = evaluate_pole_and_neutral_configuration(
+        PoleAndNeutralInput(
+            neutral_required=neutral_required,
+            neutral_pole_mode=neutral_mode,
+            pen_conductor_present=pen_present,
+            pen_switched_or_isolated=False if pen_present is False else None,
+        ),
+        phase=phase,
+        selected_poles=selected_poles,
+        available_pole_options=tuple(breaker.get("available_pole_options", [])),
+        rules=rules,
+    ).to_dict()
+    outcome.setdefault("outputs", {}).update({
+        "selected_poles": selected_poles,
+        "neutral_required": neutral_required,
+        "neutral_pole_mode": neutral_mode,
+        "selection_basis": (
+            "RCD用途已明确，按全部带电导体同时断开配置"
+            if rcd_required
+            else "按相制及已声明的中性线结构配置"
+        ),
+    })
+    return outcome
+
+
+def _product_operating_current(product: dict[str, object]) -> float | None:
+    trip = product.get("trip_configuration") or {}
+    fixed = trip.get("instantaneous_pickup_a")
+    if fixed is not None:
+        return float(fixed)
+    adjustable = trip.get("instantaneous_pickup_range_a") or []
+    if adjustable:
+        return max(float(value) for value in adjustable)
+    return None
+
+
 @app.get("/complete-circuit", response_class=HTMLResponse)
 def complete_circuit_page(request: Request):
     form = _complete_circuit_form_defaults()
@@ -596,6 +690,7 @@ def complete_circuit_page(request: Request):
             "audit_result": None,
             "alternative_result": None,
             "transformer_capacities": _engineering_transformer_capacities(),
+            "projects": db.list_projects(),
         },
     )
 
@@ -603,6 +698,15 @@ def complete_circuit_page(request: Request):
 @app.post("/complete-circuit", response_class=HTMLResponse)
 async def complete_circuit_preview(request: Request):
     submitted = await request.form()
+    context = _calculate_complete_circuit_context(dict(submitted))
+    return templates.TemplateResponse(
+        request=request,
+        name="circuit_audit.html",
+        context=context,
+    )
+
+
+def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[str, object]:
     form = {
         key: str(submitted.get(key, default)).strip()
         for key, default in _complete_circuit_form_defaults().items()
@@ -719,6 +823,8 @@ async def complete_circuit_preview(request: Request):
         "audit_result": None,
         "alternative_result": None,
         "transformer_capacities": _engineering_transformer_capacities(),
+        "projects": db.list_projects(),
+        "network_input": None,
     }
     if not errors and build_result and build_result.radial_request:
         rules = {item["code"]: item for item in db.list_rules()}
@@ -731,11 +837,8 @@ async def complete_circuit_preview(request: Request):
             build_result.radial_request,
             rules,
         ).to_dict()
-    return templates.TemplateResponse(
-        request=request,
-        name="circuit_audit.html",
-        context=context,
-    )
+        context["network_input"] = network_input
+    return context
 
 
 _ENGINEERING_SEGMENT_LABELS = {
@@ -868,6 +971,14 @@ async def quick_calculate(request: Request):
             form["voltage_factor_c"] = "1.05"
     except ValueError:
         pass
+    if form["circuit_role"] == "feeder":
+        form["circuit_application"] = "distribution"
+    elif not form["circuit_application"]:
+        form["circuit_application"] = (
+            "fixed_equipment_final"
+            if form["circuit_role"] == "single_device"
+            else "distribution"
+        )
     rules = db.rules_by_code()
     result = calculate_simple_load_selection(form, rules).to_dict()
     explicit_line_short_circuit = form["short_circuit_line_enabled"].lower() in {
@@ -968,6 +1079,104 @@ async def quick_calculate(request: Request):
                     else "兼容接口传入的既有线路截面"
                 ),
             }
+    preferred_breaker = _preferred_quick_breaker_candidate(result)
+    pole_configuration = _quick_pole_configuration(form, preferred_breaker, rules)
+    if pole_configuration:
+        result["pole_configuration"] = pole_configuration
+        selected_poles = pole_configuration.get("outputs", {}).get(
+            "selected_poles"
+        )
+        if selected_poles:
+            preferred_breaker["poles"] = selected_poles
+            preferred_breaker["adopted_poles"] = selected_poles
+
+    line_outputs = result.get("line_end_short_circuit", {}).get("outputs", {})
+    required_icu = line_outputs.get("required_breaking_capacity_ka")
+    auto_product_reference = (
+        form["phase"] == "3"
+        and preferred_breaker.get("rated_current_a") is not None
+        and required_icu is not None
+        and not form["existing_breaker_series"]
+    )
+    if auto_product_reference:
+        form["existing_breaker_series"] = "SCHNEIDER.EASYPACT.CVS.2024"
+        form["existing_breaker_trip_unit_family"] = "TM-D"
+    if form["existing_breaker_series"] == "SCHNEIDER.EASYPACT.CVS.2024":
+        rated_current = (
+            form["existing_breaker_rated_current_a"]
+            or preferred_breaker.get("rated_current_a")
+            or ""
+        )
+        if rated_current and required_icu is not None:
+            product_reference = select_easypact_cvs_reference(
+                rated_current,
+                required_icu,
+                system_voltage_v=form["voltage_v"],
+                trip_unit_family=(
+                    form["existing_breaker_trip_unit_family"] or "TM-D"
+                ),
+            )
+            product_reference["rated_current_source"] = (
+                "用户填写的现场设备额定电流"
+                if form["existing_breaker_rated_current_a"]
+                else (
+                    "系统从通用参数候选自动匹配；作为样本参数参考，非品牌推荐"
+                    if auto_product_reference
+                    else "复用本次通用断路器初选额定电流；现场铭牌仍须确认"
+                )
+            )
+            product_reference["adopted_poles"] = (
+                pole_configuration.get("outputs", {}).get("selected_poles")
+                if pole_configuration else None
+            )
+            result["existing_breaker_product_reference"] = product_reference
+            if product_reference.get("frame_code"):
+                result["warnings"] = [
+                    warning for warning in result.get("warnings", [])
+                    if not warning.startswith(
+                        "线路末端三相短路电流及Icu最低要求已算出"
+                    )
+                ]
+                result["warnings"].append(
+                    "线路起点短路电流、断路器Icu及脱扣参数已按已核验样本"
+                    "自动联动；样本仅作等效参数参考，不构成品牌推荐。"
+                )
+
+    result["selectivity_scope"] = {
+        "status": "不适用",
+        "reason": (
+            "快速计算仅包含一个保护点，没有上下级保护器件组合；"
+            "本计算边界内不存在选择性校核对象。完整回路存在上下级器件时，"
+            "在完整回路模块按制造商选择性表校核。"
+        ),
+    }
+    incomplete = result.get("outputs", {}).get("incomplete_checks", [])
+    incomplete = [item for item in incomplete if item != "选择性"]
+    cable_candidates = result.get("outputs", {}).get("cable_candidates", [])
+    selected_structure = (
+        cable_candidates[0].get("fault_loop_structure")
+        if cable_candidates else None
+    )
+    if selected_structure and (
+        form["fault_fourth_conductor_role"] == "PE"
+        or form["conductor_configuration"] == "yjv_5c_3ph_n_pe"
+    ):
+        incomplete = [
+            item for item in incomplete if item != "芯数及 N/PE 配置"
+        ]
+    if (
+        pole_configuration
+        and pole_configuration.get("provisional_status") == "通过"
+    ):
+        incomplete = [item for item in incomplete if item != "断路器极数"]
+    product_reference = result.get("existing_breaker_product_reference", {})
+    if product_reference.get("frame_code"):
+        incomplete = [
+            item for item in incomplete
+            if item not in {"断路器脱扣特性", "已选断路器Icu实物复核"}
+        ]
+    result["outputs"]["incomplete_checks"] = incomplete
+
     if form["earth_fault_enabled"].lower() in {"1", "true", "on", "yes"}:
         mcb_candidate = next(
             (
@@ -981,10 +1190,25 @@ async def quick_calculate(request: Request):
         )
         circuit_rating = form["circuit_rated_current_a"]
         circuit_rating_source = "用户提供的既有回路额定电流"
-        if not circuit_rating and mcb_candidate:
-            circuit_rating = str(mcb_candidate.get("rated_current_a") or "")
-            circuit_rating_source = "本次断路器初选的MCB额定电流"
+        if not circuit_rating and preferred_breaker:
+            circuit_rating = str(preferred_breaker.get("rated_current_a") or "")
+            circuit_rating_source = "本次断路器自动初选额定电流"
         form["circuit_rated_current_a"] = circuit_rating
+        product_reference = result.get("existing_breaker_product_reference", {})
+        product_operating_current = _product_operating_current(product_reference)
+        if (
+            not form["protective_device_operating_current_a"]
+            and product_operating_current is not None
+        ):
+            form["protective_device_operating_current_a"] = (
+                f"{product_operating_current:g}"
+            )
+            form["protective_device_operating_reference"] = (
+                f"{product_reference.get('manufacturer')} "
+                f"{product_reference.get('series')} "
+                f"{product_reference.get('trip_reference')}；"
+                "采用瞬时脱扣固定值或可调整范围上限作为保守Ia"
+            )
         earth_fault_data = {
             "earthing_system": form["earthing_system"],
             "nominal_line_to_earth_voltage_v": nominal_u0,
@@ -1025,6 +1249,7 @@ async def quick_calculate(request: Request):
             in {"yjv_4c_3ph_n_pe", "yjv_5c_3ph_n_pe"}
             and form["fault_fourth_conductor_role"] == "PE"
             and isinstance(structure, dict)
+            and structure.get("geometry_available", True)
             and selected_cable.get("section_mm2") is not None
             and form["length_m"]
             and form["fault_transformer_series_code"]
@@ -1229,6 +1454,19 @@ async def quick_calculate(request: Request):
                 "保护器件曲线/整定实物复核" if item == "故障防护" else item
                 for item in incomplete
             ]
+        pe_clearing_time = form["fault_clearing_time_s"]
+        pe_clearing_time_source = "用户提供的保护器件切除时间"
+        if (
+            not pe_clearing_time
+            and earth_fault_result.get("provisional_status") == "通过"
+            and earth_outputs.get("maximum_disconnection_time_s") is not None
+        ):
+            pe_clearing_time = str(
+                earth_outputs["maximum_disconnection_time_s"]
+            )
+            pe_clearing_time_source = (
+                "采用本回路自动切断校核允许的最长时间作热稳定保守上界"
+            )
         explicit_pe_thermal = form["pe_thermal_enabled"].lower() in {
             "1", "true", "on", "yes"
         }
@@ -1250,7 +1488,7 @@ async def quick_calculate(request: Request):
                     "prospective_fault_current_a": earth_fault_result.get(
                         "outputs", {}
                     ).get("prospective_earth_fault_current_a"),
-                    "fault_clearing_time_s": form["fault_clearing_time_s"],
+                    "fault_clearing_time_s": pe_clearing_time,
                     "let_through_energy_a2s": form["let_through_energy_a2s"],
                     "let_through_energy_reference": form[
                         "let_through_energy_reference"
@@ -1259,6 +1497,10 @@ async def quick_calculate(request: Request):
                 rules,
             ).to_dict()
             result["pe_thermal"] = pe_thermal_result
+            if pe_clearing_time:
+                pe_thermal_result.setdefault("outputs", {})[
+                    "adopted_clearing_time_source"
+                ] = pe_clearing_time_source
             for stage in result.get("outputs", {}).get("workflow_stages", []):
                 if stage.get("code") == "pe_thermal":
                     if pe_thermal_result.get("provisional_status") in {"通过", "不通过"}:
@@ -1356,61 +1598,39 @@ async def quick_calculate(request: Request):
                 else item
                 for item in incomplete
             ]
-    if form["existing_breaker_series"] == "SCHNEIDER.EASYPACT.CVS.2024":
-        breaker_candidates = result.get("outputs", {}).get(
-            "breaker_design_candidates", []
+    product_reference = result.get("existing_breaker_product_reference", {})
+    if product_reference.get("frame_code"):
+        permitted_i2t = (
+            result.get("phase_thermal", {})
+            .get("outputs", {})
+            .get("maximum_permitted_let_through_energy_a2s")
         )
-        generic_breaker = breaker_candidates[0] if breaker_candidates else {}
-        rated_current = (
-            form["existing_breaker_rated_current_a"]
-            or generic_breaker.get("rated_current_a")
-            or ""
-        )
-        required_icu = line_outputs.get("required_breaking_capacity_ka")
-        if rated_current and required_icu is not None:
-            product_reference = select_easypact_cvs_reference(
-                rated_current,
-                required_icu,
-                system_voltage_v=form["voltage_v"],
-                trip_unit_family=(
-                    form["existing_breaker_trip_unit_family"] or "TM-D"
-                ),
+        line_start_ik = line_outputs.get("line_start_short_circuit_current_ka")
+        if permitted_i2t is not None and line_start_ik is not None:
+            product_thermal = evaluate_easypact_cvs_phase_thermal_reference(
+                product_reference,
+                line_start_ik,
+                permitted_i2t,
             )
-            product_reference["rated_current_source"] = (
-                "用户填写的现场设备额定电流"
-                if form["existing_breaker_rated_current_a"]
-                else "复用本次通用断路器初选额定电流；现场铭牌仍须确认"
-            )
-            result["existing_breaker_product_reference"] = product_reference
-            permitted_i2t = (
-                result.get("phase_thermal", {})
-                .get("outputs", {})
-                .get("maximum_permitted_let_through_energy_a2s")
-            )
-            line_start_ik = line_outputs.get(
-                "line_start_short_circuit_current_ka"
-            )
-            if (
-                product_reference.get("frame_code")
-                and permitted_i2t is not None
-                and line_start_ik is not None
-            ):
-                result["existing_breaker_phase_thermal"] = (
-                    evaluate_easypact_cvs_phase_thermal_reference(
-                        product_reference,
-                        line_start_ik,
-                        permitted_i2t,
-                    )
+            result["existing_breaker_phase_thermal"] = product_thermal
+            if product_thermal.get("provisional_status") in {"通过", "不通过"}:
+                incomplete = result.get("outputs", {}).get(
+                    "incomplete_checks", []
                 )
-        else:
-            result["existing_breaker_product_reference"] = {
-                "status": "无法判断",
-                "provisional_status": "无法判断",
-                "reason": (
-                    "须先形成断路器额定电流候选和线路起点短路电流，"
-                    "才能核对EasyPact CVS。"
-                ),
-            }
+                result["outputs"]["incomplete_checks"] = [
+                    item
+                    for item in incomplete
+                    if item not in {
+                        "相导体热稳定",
+                        "相导体切除时间/I²t实物复核",
+                    }
+                ]
+                for stage in result.get("outputs", {}).get(
+                    "workflow_stages", []
+                ):
+                    if stage.get("code") == "phase_thermal":
+                        stage["label"] = "相导体热稳定（产品I²t）"
+                        stage["state"] = "completed"
     return templates.TemplateResponse(
         request=request, name="quick.html",
         context={"form": form, "result": result, "load_groups": grouped_load_types(), "scenarios": INSTALLATION_SCENARIOS, "conductor_configurations": CONDUCTOR_CONFIGURATIONS, "tray_options": TRAY_CONFIGURATION_OPTIONS, "transformer_capacities": sorted(TRANSFORMER_LV_SHORT_CIRCUIT["rows"]), "fault_transformer_series": TRANSFORMER_PHASE_PE_IMPEDANCE["series"], "fault_transformer_capacities": sorted({capacity for series in TRANSFORMER_PHASE_PE_IMPEDANCE["series"].values() for capacity in series["rows"]}), "busway_phase_pe_series": BUSWAY_PHASE_PE_IMPEDANCE["series"], "busway_phase_pe_ratings": sorted({rating for series in BUSWAY_PHASE_PE_IMPEDANCE["series"].values() for rating in series["rows"]})},
@@ -1430,6 +1650,12 @@ def project_page(request: Request, project_id: int, message: str = ""):
     project = db.get_project(project_id)
     if not project:
         raise HTTPException(404, "项目不存在")
+    network = db.get_project_network(project_id)
+    if network:
+        network["changed_fields_display"] = [
+            NETWORK_INPUT_LABELS.get(field, field)
+            for field in network["changed_fields_json"]
+        ]
     return templates.TemplateResponse(
         request=request,
         name="project.html",
@@ -1437,9 +1663,116 @@ def project_page(request: Request, project_id: int, message: str = ""):
             "project": project,
             "circuits": db.list_circuits(project_id),
             "runs": db.list_runs(project_id),
+            "network": network,
+            "network_runs": db.list_network_runs(project_id),
             "message": message,
         },
     )
+
+
+@app.get("/projects/{project_id}/complete-circuit", response_class=HTMLResponse)
+def project_complete_circuit_page(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+    network = db.get_project_network(project_id)
+    context = _calculate_complete_circuit_context(
+        network["input_json"] if network else _complete_circuit_form_defaults()
+    )
+    context.update({"project": project, "selected_project_id": project_id})
+    return templates.TemplateResponse(
+        request=request, name="circuit_audit.html", context=context
+    )
+
+
+@app.post("/projects/{project_id}/complete-circuit")
+async def save_project_complete_circuit(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+    submitted = dict(await request.form())
+    context = _calculate_complete_circuit_context(submitted)
+    if context["errors"] or not context["alternative_result"]:
+        context.update({"request": request, "project": project, "selected_project_id": project_id})
+        return templates.TemplateResponse(
+            request=request, name="circuit_audit.html", context=context, status_code=422
+        )
+    network = db.save_project_network(project_id, context["form"])
+    rule_codes = _collect_rule_codes(context["alternative_result"])
+    if context["audit_result"]:
+        rule_codes.update(_collect_rule_codes(context["audit_result"]))
+    rules = db.rules_by_code()
+    snapshot = {code: rules[code] for code in sorted(rule_codes) if code in rules}
+    run_id = db.create_network_run(
+        project_id,
+        network,
+        engine_version=__version__,
+        task_mode=context["form"]["task_mode"],
+        input_snapshot=context["form"],
+        derived=context["derived"] or {},
+        audit_result=context["audit_result"],
+        result=context["alternative_result"],
+        rule_snapshot=snapshot,
+    )
+    return RedirectResponse(f"/network-runs/{run_id}", status_code=303)
+
+
+@app.get("/network-runs/{run_id}", response_class=HTMLResponse)
+def network_run_page(request: Request, run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    return templates.TemplateResponse(
+        request=request, name="network_run.html", context={"run": run}
+    )
+
+
+@app.get("/network-runs/{run_id}/report.pdf")
+def export_network_run_pdf(run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    content = create_network_run_pdf(run)
+    filename = (
+        f"{run['project_code']}-{run['input_snapshot'].get('circuit_code', '完整回路')}"
+        f"-V{run['network_revision']}-计算书.pdf"
+    )
+    return Response(
+        content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+@app.get("/network-runs/{run_id}/export.xlsx")
+def export_network_run_excel(run_id: int):
+    run = db.get_network_run(run_id)
+    if not run:
+        raise HTTPException(404, "完整回路计算记录不存在")
+    content = create_network_run_export(run)
+    filename = (
+        f"{run['project_code']}-{run['input_snapshot'].get('circuit_code', '完整回路')}"
+        f"-V{run['network_revision']}-成果表.xlsx"
+    )
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+def _collect_rule_codes(payload: object) -> set[str]:
+    codes: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key == "rule_codes" and isinstance(value, (list, tuple)):
+                codes.update(str(item) for item in value)
+            else:
+                codes.update(_collect_rule_codes(value))
+    elif isinstance(payload, (list, tuple)):
+        for item in payload:
+            codes.update(_collect_rule_codes(item))
+    return codes
 
 
 @app.post("/projects/{project_id}/circuits")
