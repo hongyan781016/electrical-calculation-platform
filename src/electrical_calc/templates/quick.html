@@ -673,7 +673,7 @@
           <div><dt>断路器安装点</dt><dd>{% if icu.installation_point == 'line_start' %}线路起点{% elif icu.installation_point == 'line_end' %}线路末端{% else %}{{ icu.installation_point or '无法判断' }}{% endif %}</dd></div>
           <div><dt>本次采用电压系数 c</dt><dd>{{ line_sc_outputs.voltage_factor_c or '无法判断' }}</dd></div>
           <div><dt>依据编号</dt><dd>{{ line_sc.rule_codes|join(' / ') if line_sc.rule_codes else '无法判断' }}</dd></div>
-          <div><dt>未纳入本次暂算</dt><dd>TN-S/TN-C-S接地故障、脱扣特性、选择性</dd></div>
+          <div><dt>后续联动</dt><dd>接地故障、脱扣参数和导体热稳定见下方连续校核结果</dd></div>
         </dl>
       </section>
     </div>
@@ -808,6 +808,7 @@
           · 最大分断时间 {{ product.trip_configuration.instantaneous_maximum_break_time_ms }} ms（{{ product.trip_configuration.maximum_break_time_condition }}）
         {% endif %}
       </dd></div>
+      <div><dt>采用极数</dt><dd>{{ product.adopted_poles or '无法判断' }}</dd></div>
       <div><dt>Icu暂算</dt><dd>{% if product_thermal.selected_icu_ka is defined %}{{ product_thermal.selected_icu_ka }} kA ≥ {{ product_thermal.prospective_short_circuit_current_ka }} kA{% else %}{{ product.reason }}{% endif %}</dd></div>
       <div><dt>断路器保守通过能量</dt><dd>{% if product_thermal.breaker_conservative_let_through_i2t_a2s is defined %}{{ product_thermal.breaker_conservative_let_through_i2t_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
       <div><dt>电缆允许热应力</dt><dd>{% if product_thermal.permitted_cable_i2t_a2s is defined %}{{ product_thermal.permitted_cable_i2t_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
@@ -819,6 +820,26 @@
     {% else %}
     <section class="alert warning"><strong>无法形成产品复核</strong><span>{{ product.reason }}</span></section>
     {% endif %}
+  </section>
+  {% endif %}
+
+  {% if result.pole_configuration or result.selectivity_scope %}
+  <section class="panel candidate-panel">
+    <div class="section-title">
+      <div><p class="eyebrow">PROTECTION STRUCTURE</p><h2>极数与选择性边界</h2></div>
+    </div>
+    <dl class="parameter-grid">
+      {% if result.pole_configuration %}
+      <div><dt>断路器极数</dt><dd>{{ result.pole_configuration.outputs.selected_poles or '无法判断' }}</dd></div>
+      <div><dt>N极方式</dt><dd>{{ result.pole_configuration.outputs.neutral_pole_mode or '无法判断' }}</dd></div>
+      <div><dt>判定依据</dt><dd>{{ result.pole_configuration.outputs.selection_basis or '无法判断' }}</dd></div>
+      <div><dt>结构暂算</dt><dd>{{ result.pole_configuration.provisional_status }}</dd></div>
+      {% endif %}
+      {% if result.selectivity_scope %}
+      <div><dt>选择性</dt><dd>{{ result.selectivity_scope.status }}</dd></div>
+      <div><dt>适用边界</dt><dd>{{ result.selectivity_scope.reason }}</dd></div>
+      {% endif %}
+    </dl>
   </section>
   {% endif %}
 
@@ -840,6 +861,7 @@
       <div><dt>本次接地故障电流</dt><dd>{% if pe_outputs.prospective_fault_current_a is defined %}{{ pe_outputs.prospective_fault_current_a }} A{% else %}无法判断{% endif %}</dd></div>
       <div><dt>最大允许切除时间</dt><dd>{% if pe_outputs.maximum_permitted_clearing_time_s is defined %}≤ {{ pe_outputs.maximum_permitted_clearing_time_s }} s{% else %}待产品曲线{% endif %}</dd></div>
       <div><dt>切除时间控制依据</dt><dd>{{ pe_outputs.clearing_time_governing_basis or '无法判断' }}{% if pe_outputs.calculated_thermal_time_limit_s is defined and pe_outputs.calculated_thermal_time_limit_s > 5 %}（按热应力计算为{{ pe_outputs.calculated_thermal_time_limit_s }}s，超过本方法适用范围）{% endif %}</dd></div>
+      {% if pe_outputs.adopted_clearing_time_source %}<div><dt>采用切除时间来源</dt><dd>{{ pe_outputs.adopted_clearing_time_source }}</dd></div>{% endif %}
       <div><dt>最大允许通过能量</dt><dd>{% if pe_outputs.maximum_permitted_let_through_energy_a2s is defined %}I²t ≤ {{ pe_outputs.maximum_permitted_let_through_energy_a2s }} A²·s{% else %}无法判断{% endif %}</dd></div>
       {% if pe_outputs.source %}<div><dt>计算依据</dt><dd>{{ pe_outputs.source }} · {{ pe_outputs.section }} · {{ pe_outputs.pages }}</dd></div>{% endif %}
     </dl>
@@ -1001,6 +1023,11 @@
       <strong>实施顺序</strong><br>
       下一阶段：环境温度修正与更多成组敷设条件 → 三相短路与分断能力联动 → 断路器极数与选择性。
     </div>
+  </section>
+  {% else %}
+  <section class="panel candidate-panel">
+    <p class="eyebrow">CLOSED LOOP</p><h2>本次计算边界内的专业校核已闭合</h2>
+    <p class="basis-note">负荷、电缆载流量、电压降、三相短路、断路器Icu与脱扣参数、接地故障、相导体及PE热稳定均已形成暂算结论；选择性在单保护点快速计算中不适用。正式状态仍以规则及资料批准状态为准。</p>
   </section>
   {% endif %}
 

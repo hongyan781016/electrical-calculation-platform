@@ -308,7 +308,7 @@ def test_yjv_buried_duct_voltage_drop_uses_table_3_21_impedance():
     assert voltage_drop["status"] == UNKNOWN
 
 
-def test_quick_page_only_uses_mcb_parameters_and_fault_current_for_icu():
+def test_quick_page_uses_mcb_and_distribution_mccb_parameters_for_icu():
     result = calculate_simple_load_selection(
         data(
             input_basis="current",
@@ -327,7 +327,13 @@ def test_quick_page_only_uses_mcb_parameters_and_fault_current_for_icu():
     assert mcb["frame_label"] == "电流规格等级"
     assert mcb["page"] == "PDF第79页"
     assert mcb["selected_icu_ka"] == 6
-    assert [item["family_code"] for item in result.outputs["breaker_design_candidates"]] == ["MCB"]
+    assert [item["family_code"] for item in result.outputs["breaker_design_candidates"]] == ["MCB", "MCCB"]
+    mccb = next(
+        item for item in result.outputs["breaker_design_candidates"]
+        if item["family_code"] == "MCCB"
+    )
+    assert mccb["rated_current_a"] == 50
+    assert mccb["frame_label"] == "壳架电流"
 
 
 def test_transformer_lv_outlet_short_circuit_uses_verified_table_value():

@@ -11,6 +11,7 @@ from .catalog import (
     resolve_conductor_ampacity_basis,
 )
 from .engine import FAIL, Outcome, PASS, Step, UNKNOWN
+from .protective_conductor import calculate_pe_minimum_section_by_table
 
 
 ENGINE_VERSION = "1.16.0"
@@ -132,9 +133,9 @@ def _breaker_design_candidates(
 
     candidates: list[dict[str, Any]] = []
     for code, family in parameters.get("families", {}).items():
-        # 普通负荷快速页只给出MCB参数档位；D型MCB和MCCB的产品
-        # 曲线/整定应在电动机模块按实际设备建立，不能在此页泛化。
-        if code != "MCB":
+        # 普通负荷快速页覆盖MCB和配电保护型MCCB。电动机专用D型MCB、
+        # MA磁脱扣器等仍由电动机模块按制造商配合表处理。
+        if code not in {"MCB", "MCCB"}:
             continue
         selected_group = None
         selected_rating = None
@@ -163,6 +164,7 @@ def _breaker_design_candidates(
             "frame_rating_a": float(selected_group["frame_a"]),
             "frame_label": {
                 "MCB": "电流规格等级",
+                "MCCB": "壳架电流",
             }[code],
             "rated_current_a": selected_rating,
             "rated_voltage_v": family["rated_voltage_v"],
@@ -846,6 +848,41 @@ def calculate_simple_load_selection(
         fault_loop_structure = lookup_yjv_fault_loop_structure(
             configuration_code, candidates[0]["section_mm2"]
         )
+        if (
+            fault_loop_structure is None
+            and configuration_code in {"yjv_4c_3ph_n_pe", "yjv_5c_3ph_n_pe"}
+        ):
+            pe_selection = calculate_pe_minimum_section_by_table(
+                {
+                    "phase_conductor_section_mm2": candidates[0]["section_mm2"],
+                    "phase_conductor_material": "copper",
+                    "protective_conductor_material": "copper",
+                    "separate_protective_conductor": False,
+                },
+                rules,
+            )
+            pe_section = pe_selection.outputs.get(
+                "required_minimum_pe_section_mm2"
+            )
+            if pe_section is not None:
+                fault_loop_structure = {
+                    "family": "YJV",
+                    "configuration_code": configuration_code,
+                    "phase_section_mm2": candidates[0]["section_mm2"],
+                    "protective_section_mm2": float(pe_section),
+                    "geometry_available": False,
+                    "impedance_method": "tn_conventional",
+                    "source": pe_selection.outputs.get("source"),
+                    "table": pe_selection.outputs.get("clause"),
+                    "page": pe_selection.outputs.get("location"),
+                    "status": "verified",
+                    "geometry_note": (
+                        "该截面超出当前圆形线芯几何表覆盖范围；"
+                        "PE截面按表54.2取得，故障电流采用TN常规法保守计算。"
+                    ),
+                }
+                if "ELEC.PE.MIN_SECTION.TABLE54_2" not in rule_codes:
+                    rule_codes.append("ELEC.PE.MIN_SECTION.TABLE54_2")
         if fault_loop_structure:
             candidates[0]["fault_loop_structure"] = fault_loop_structure
             if "ELEC.CABLE.YJV.STRUCTURE" not in rule_codes:

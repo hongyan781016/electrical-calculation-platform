@@ -134,7 +134,7 @@ def test_quick_selection_does_not_require_project_or_excel(tmp_path, monkeypatch
     assert "45.5803 A" in result.text
     assert "断路器设计参数要求" in result.text
     assert "微型断路器（MCB）" in result.text
-    assert "塑壳断路器（MCCB）" not in result.text
+    assert "塑壳断路器（MCCB）" in result.text
     assert "Icu待算" in result.text
     assert "N/PE" in result.text
     assert "当前结构与已核实的YJV三芯基础载流量表一致" in result.text
@@ -658,7 +658,7 @@ def test_quick_transformer_lv_outlet_short_circuit_lookup(tmp_path, monkeypatch)
     assert "61.2 kA" in result.text
     assert "表15.7" in result.text
     assert "Icu 要求超出当前表列档位" in result.text
-    assert "塑壳断路器（MCCB）" not in result.text
+    assert "塑壳断路器（MCCB）" in result.text
 
 
 def test_quick_unknown_kw_accepts_user_power_factor(tmp_path, monkeypatch):
@@ -769,7 +769,10 @@ def test_quick_shared_transformer_fields_derive_rx_and_icu_requirement(tmp_path,
     assert short_stage == {
         "code": "short_circuit", "label": "短路电流与Icu要求", "state": "completed"
     }
-    assert "已选断路器Icu实物复核" in captured["result"]["outputs"]["incomplete_checks"]
+    assert "已选断路器Icu实物复核" not in captured["result"]["outputs"]["incomplete_checks"]
+    assert captured["result"]["existing_breaker_product_reference"]["icu_ka"] >= (
+        line_result["outputs"]["required_breaking_capacity_ka"]
+    )
     assert not any(
         warning.startswith("未提供安装点预期短路电流")
         for warning in captured["result"]["warnings"]
@@ -1154,17 +1157,16 @@ def test_quick_five_core_auto_uses_one_core_as_pe_for_design_selection(
     )
     assert earth["outputs"]["prospective_earth_fault_current_a"] > 0
     assert earth["outputs"]["maximum_permitted_operating_current_a"] > 0
-    assert earth["provisional_status"] == "无法判断"
+    assert earth["provisional_status"] == "通过"
     assert [candidate["curve"] for candidate in curve_candidates] == ["B", "C"]
     assert all(
         candidate["operating_current_a"] > 0 for candidate in curve_candidates
     )
-    assert earth_stage["label"] == "接地故障与保护约束"
-    assert earth_stage["state"] == "candidate"
-    assert "保护器件曲线/整定实物复核" in (
+    assert earth_stage["state"] == "completed"
+    assert "保护器件曲线/整定实物复核" not in (
         captured["result"]["outputs"]["incomplete_checks"]
     )
-    assert "参数候选暂算" in response.text
+    assert "断路器产品参考复核" in response.text
 
 
 def test_quick_pe_thermal_uses_selected_yjv_pe_and_calculated_fault_current(
@@ -1312,13 +1314,70 @@ def test_quick_auto_builds_short_circuit_icu_and_thermal_constraints_without_exp
     assert pe["outputs"]["maximum_permitted_clearing_time_s"] > 0
     assert pe["outputs"]["maximum_permitted_let_through_energy_a2s"] > 0
     assert stages["short_circuit"]["state"] == "completed"
-    assert stages["phase_thermal"]["state"] == "candidate"
+    assert stages["phase_thermal"]["state"] == "completed"
     assert stages["pe_thermal"]["state"] == "candidate"
-    assert "相导体切除时间/I²t实物复核" in result["outputs"]["incomplete_checks"]
+    assert "相导体切除时间/I²t实物复核" not in result["outputs"]["incomplete_checks"]
     assert "PE切除时间/I²t实物复核" in result["outputs"]["incomplete_checks"]
 
 
-def test_quick_only_uses_cvs_curve_after_explicit_product_series_selection(
+def test_quick_feeder_closes_protection_chain_without_expert_inputs(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "quick-closed-loop.db"))
+    captured = capture_template_context(monkeypatch)
+    client = TestClient(web.app)
+
+    response = client.post("/quick", data={
+        "circuit_role": "feeder",
+        "input_basis": "kw",
+        "input_value": "100",
+        "power_definition": "installed",
+        "demand_factor": "0.8",
+        "phase": "3",
+        "voltage_v": "380",
+        "load_type_code": "cold_storage",
+        "conductor_family": "YJV",
+        "conductor_configuration": "yjv_5c_3ph_n_pe",
+        "installation_scenario": "tray",
+        "tray_type": "horizontal_perforated",
+        "tray_layers": "1",
+        "tray_cables_per_layer": "4",
+        "installation_temperature_c": "40",
+        "length_m": "100",
+        "transformer_series_code": "scb11",
+        "transformer_capacity_kva": "630",
+        "transformer_uk_percent": "6",
+        "source_impedance_mode": "short_circuit_capacity",
+        "source_short_circuit_capacity_mva": "100",
+        "earth_fault_enabled": "true",
+        "earthing_system": "TN-S",
+        "circuit_application": "fixed_equipment_final",
+        "protection_type": "overcurrent",
+        "protective_device_characteristic": "manual",
+        "fault_fourth_conductor_role": "PE",
+        "rcd_scenario": "fire_300ma",
+        "rcd_residual_waveform": "ac",
+    })
+
+    result = captured["result"]
+    product = result["existing_breaker_product_reference"]
+    assert response.status_code == 200
+    assert captured["form"]["circuit_application"] == "distribution"
+    assert result["outputs"]["incomplete_checks"] == []
+    assert product["frame_code"] == "CVS160"
+    assert product["rated_current_a"] == 160
+    assert product["icu_ka"] >= result["line_end_short_circuit"]["outputs"][
+        "required_breaking_capacity_ka"
+    ]
+    assert product["adopted_poles"] == "4P"
+    assert result["earth_fault"]["provisional_status"] == "通过"
+    assert result["pe_thermal"]["provisional_status"] == "通过"
+    assert result["existing_breaker_phase_thermal"]["provisional_status"] == "通过"
+    assert result["selectivity_scope"]["status"] == "不适用"
+    assert "本次计算边界内的专业校核已闭合" in response.text
+
+
+def test_quick_auto_uses_cvs_curve_and_explicit_selection_remains_supported(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(web, "db", Database(tmp_path / "quick-cvs-review.db"))
@@ -1336,7 +1395,10 @@ def test_quick_only_uses_cvs_curve_after_explicit_product_series_selection(
 
     response = client.post("/quick", data=base_data)
     assert response.status_code == 200
-    assert "existing_breaker_product_reference" not in captured["result"]
+    assert captured["result"]["existing_breaker_product_reference"]["frame_code"] == "CVS100"
+    assert "样本参数参考，非品牌推荐" in (
+        captured["result"]["existing_breaker_product_reference"]["rated_current_source"]
+    )
 
     response = client.post("/quick", data={
         **base_data,
