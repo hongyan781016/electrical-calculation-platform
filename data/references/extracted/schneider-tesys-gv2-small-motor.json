@@ -7,9 +7,9 @@
   "source": {
     "coordination_document": "https://productinfo.se.com/tesys_island_atex_adaptation_guide/tesys-island-atex-adaptaion-guide/EN/TeSys_Island_ATEX_Adaptation_Guide_DOCA0452EN-00.xml/$/Island_ATEX_MPCBSelection_DD01357952",
     "coordination_reference": "MPCB Selection，Type 2 Coordination，400/415V表",
-    "gv2me04_document": "data/references/raw/product-reference/official-web/Schneider_GV2ME04_Datasheet_2026.pdf",
+    "gv2me04_document": "https://iportal.se.com/Contents/docs/TESYS%20GV2_GV2ME04_DATA%20SHEET.PDF",
     "gv2me04_reference": "PDF第1页产品参数；PDF第6页热限制曲线",
-    "gv2me05_document": "data/references/raw/product-reference/official-web/Schneider_GV2ME05_Datasheet_2026.pdf",
+    "gv2me05_document": "https://iportal2.schneider-electric.com/Contents/docs/SQD-GV2ME05.PDF",
     "gv2me05_reference": "PDF第1页产品参数",
     "earth_loop_document": "https://www.se.com/uk/en/faqs/FA139612/",
     "earth_loop_reference": "TeSys GV2 Range，GV2ME表"

@@ -140,6 +140,7 @@ def test_each_motor_cable_candidate_is_recalculated_in_complete_network():
 
 def test_verified_motor_power_coverage_matrix_does_not_overstate_purchase_scope():
     purchase_ready: list[float] = []
+    selected_specs: dict[float, tuple[str, str]] = {}
     for power_kw in AVAILABLE_RATED_OUTPUT_POWERS_KW:
         reference = resolve_motor_reference_parameters(
             MotorCatalogQuery(power_kw, 4), rules()
@@ -163,8 +164,16 @@ def test_verified_motor_power_coverage_matrix_does_not_overstate_purchase_scope(
             scheme = result.outputs["candidates"][position]["primary_scheme"]
             if scheme["status"] == "有条件采用":
                 purchase_ready.append(power_kw)
+                selected_specs[power_kw] = (
+                    result.outputs["recommended_cable_specification"],
+                    scheme["scheme_id"],
+                )
 
     assert tuple(purchase_ready) == COMPLETE_SELECTION_POWERS_KW
+    assert set(selected_specs) == set(AVAILABLE_RATED_OUTPUT_POWERS_KW)
+    assert selected_specs[0.12][1] == "schneider_tesys_gv2_type2_dol"
+    assert selected_specs[30.0][0] == "YJV-0.6/1kV 四芯电缆 25mm²"
+    assert selected_specs[200.0][0] == "YJV-0.6/1kV 四芯电缆 240mm²"
 
 
 def test_smallest_catalog_motor_uses_exact_gv2_type2_route():
