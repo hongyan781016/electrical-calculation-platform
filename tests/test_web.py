@@ -26,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.4.1"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.5.0"}
 
     response = client.post(
         "/projects",
@@ -580,6 +580,8 @@ def test_motor_page_can_recalculate_each_cable_in_complete_network(tmp_path, mon
     assert "末端最小相—PE故障" in response.text
     assert "相导体允许最长切除" in response.text
     assert "启动母线/端子电压" in response.text
+    assert "启动电压分开判定" in response.text
+    assert "端子转矩待核对" in response.text
     assert "该电缆对应的断路器必须满足" in response.text
     assert "Icu：≥" in response.text
     assert "通用参数档位" in response.text

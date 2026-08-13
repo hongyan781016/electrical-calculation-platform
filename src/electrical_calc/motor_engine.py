@@ -728,6 +728,12 @@ def calculate_motor_starting_approximation(
         "starting_bus_voltage_percent": None,
         "starting_motor_terminal_voltage_percent": None,
         "bus_voltage_check": UNKNOWN,
+        "motor_terminal_torque_check": UNKNOWN,
+        "voltage_reference": {
+            "source_bus_voltage_pu": data.source_bus_voltage_pu,
+            "system_average_voltage_kv": data.system_average_voltage_kv,
+            "nominal_network_voltage_kv": data.nominal_network_voltage_kv,
+        },
     }
     positive_values = (
         (data.nominal_network_voltage_kv, "网络标称电压"),
@@ -870,6 +876,9 @@ def calculate_motor_starting_approximation(
     )
     warnings.append(
         "本结果采用设计手册表6.5-4容量法，仅为近似计算；必要时应使用完整网络R/X法。"
+    )
+    warnings.append(
+        "电动机端子启动电压只用于后续启动转矩校核；尚无负载阻转矩和电动机转矩曲线，不能判定能否成功启动。"
     )
     if data.minimum_bus_voltage_percent is None:
         warnings.append("未取得适用的启动母线电压限值；仅输出母线和端子电压。")

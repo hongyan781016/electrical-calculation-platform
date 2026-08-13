@@ -65,6 +65,7 @@ from .motor_product_protection import evaluate_cm3_motor_reference
 from .product_protection import (
     select_easypact_ma_motor_reference,
     select_easypact_type1_motor_reference,
+    select_tesys_gv2_small_motor_reference,
 )
 
 
@@ -233,7 +234,7 @@ def _build_primary_motor_scheme(
         "overload_device": None,
         "closed_checks": [],
         "purchase_conditions": [],
-        "professional_pending": ["上下级选择性或后备保护"],
+        "professional_pending": ["电动机端子启动转矩", "上下级选择性或后备保护"],
     }
     if not cm3 or cm3.get("frame_code") is None or not contactor or not relay:
         result["purchase_conditions"].append(
@@ -320,6 +321,62 @@ def _build_motor_product_scheme_candidates(
         }
     )
     schemes: list[dict[str, Any]] = []
+    gv2 = candidate.get("tesys_gv2_reference")
+    if gv2 and gv2.get("breaker_model"):
+        gv2_checks = {
+            "电动机额定电流在热整定范围内": gv2.get("motor_current_status", UNKNOWN),
+            "启动电流避开磁脱扣": gv2.get("starting_ride_through_status", UNKNOWN),
+            "安装点短路电流不超过表列Iq": gv2.get("icu_status", UNKNOWN),
+            "末端故障进入保证磁脱扣区": gv2.get("terminal_magnetic_trip_status", UNKNOWN),
+            "相导体限流热稳定": gv2.get("phase_thermal_status", UNKNOWN),
+            "PE故障切除热稳定": gv2.get("pe_thermal_status", UNKNOWN),
+            "电缆综合复核": candidate.get("cable_decision_status", UNKNOWN),
+        }
+        gv2_status = (
+            FAIL if FAIL in gv2_checks.values()
+            else "有条件采用" if all(value == PASS for value in gv2_checks.values())
+            else UNKNOWN
+        )
+        schemes.append(
+            {
+                "scheme_id": "schneider_tesys_gv2_type2_dol",
+                "brand_scope": "施耐德TeSys GV2＋TeSys Deca接触器",
+                "status": gv2_status,
+                "status_label": (
+                    "制造商2类配合及网络安全校核已闭合"
+                    if gv2_status == "有条件采用"
+                    else "存在硬条件不满足" if gv2_status == FAIL
+                    else "产品级证据仍有未闭合项"
+                ),
+                "selection_basis": "制造商IEC 60947-4-1、400/415V直接启动2类配合精确行；380V按同一应用电压档处理",
+                "architecture": "热磁式电动机保护断路器＋AC-3接触器（过载保护由GV2承担）",
+                "cable": candidate["cable"].get("cable_specification"),
+                "breaker": (
+                    f"{gv2['breaker_model']} / 3P / 380～415V / "
+                    f"热整定{gv2['setting_min_a']:g}～{gv2['setting_max_a']:g}A，"
+                    f"整定至{gv2['setting_target_a']:.3f}A / "
+                    f"磁脱扣{gv2['magnetic_trip_a']:g}A（上限{gv2['magnetic_trip_upper_tolerance_a']:g}A） / "
+                    f"表列Iq {gv2['coordination_iq_ka']:g}kA"
+                ),
+                "contactor": f"{gv2['contactor_model']} / AC-3",
+                "overload_device": "由GV2热脱扣承担，不另配热继电器",
+                "closed_checks": [
+                    label for label, status in gv2_checks.items() if status == PASS
+                ],
+                "purchase_conditions": [
+                    "保护器最终按拟购电动机铭牌额定电流整定",
+                    "接触器线圈电压按实际控制电源选择",
+                ],
+                "professional_pending": [
+                    "电动机端子启动转矩",
+                    "上下级选择性或后备保护",
+                    "产品资料批准状态",
+                ],
+                "blocking_reasons": [
+                    label for label, status in gv2_checks.items() if status != PASS
+                ],
+            }
+        )
     schneider = candidate.get("schneider_type1_reference")
     if schneider and schneider.get("breaker_model"):
         schneider_checks = {
@@ -365,7 +422,7 @@ def _build_motor_product_scheme_candidates(
                 "热继电器最终按拟购电动机铭牌额定电流整定",
                 "接触器线圈电压按实际控制电源选择",
             ],
-            "professional_pending": ["上下级选择性或后备保护", "产品资料批准状态"],
+            "professional_pending": ["电动机端子启动转矩", "上下级选择性或后备保护", "产品资料批准状态"],
             "blocking_reasons": [label for label, status in schneider_checks.items() if status != PASS],
         })
     schneider_ma = candidate.get("schneider_ma_reference")
@@ -409,7 +466,7 @@ def _build_motor_product_scheme_candidates(
                 "热继电器最终按拟购电动机铭牌额定电流整定",
                 "接触器线圈电压按实际控制电源选择",
             ],
-            "professional_pending": ["制造商成套配合等级", "上下级选择性或后备保护", "产品资料批准状态"],
+            "professional_pending": ["电动机端子启动转矩", "制造商成套配合等级", "上下级选择性或后备保护", "产品资料批准状态"],
             "blocking_reasons": [label for label, status in ma_checks.items() if status != PASS],
         })
     schemes.append(primary)
@@ -746,6 +803,7 @@ def evaluate_motor_cable_candidates_in_network(
         cdm3e_motor_reference = None
         schneider_type1_reference = None
         schneider_ma_reference = None
+        tesys_gv2_reference = None
         phase_max_time = phase_thermal.outputs.get(
             "maximum_permitted_clearing_time_s"
         )
@@ -852,6 +910,20 @@ def evaluate_motor_cable_candidates_in_network(
                         ),
                     )
                 elif motor.known_basis == MotorKnownBasis.RATED_OUTPUT_POWER_KW:
+                    tesys_gv2_reference = select_tesys_gv2_small_motor_reference(
+                        motor_power_kw=float(motor.known_value),
+                        motor_rated_current_a=float(rated_current),
+                        motor_starting_current_a=float(starting_current),
+                        system_voltage_v=network.system_voltage_v,
+                        required_icu_ka=float(source_ik_ka),
+                        terminal_fault_current_a=float(terminal_if_a),
+                        phase_permitted_i2t_a2s=float(
+                            phase_thermal.outputs["permitted_thermal_stress_a2s"]
+                        ),
+                        pe_permitted_i2t_a2s=float(
+                            pe_thermal.outputs["permitted_thermal_stress_a2s"]
+                        ),
+                    )
                     schneider_ma_reference = select_easypact_ma_motor_reference(
                         motor_rated_current_a=float(rated_current),
                         motor_starting_current_a=float(starting_current),
@@ -896,6 +968,9 @@ def evaluate_motor_cable_candidates_in_network(
                 )
 
         selected_phase_status = (
+            tesys_gv2_reference.get("phase_thermal_status", UNKNOWN)
+            if tesys_gv2_reference and tesys_gv2_reference.get("breaker_model")
+            else
             schneider_type1_reference.get("phase_thermal_status", UNKNOWN)
             if schneider_type1_reference and schneider_type1_reference.get("breaker_model")
             else schneider_ma_reference.get("phase_thermal_status", UNKNOWN)
@@ -905,6 +980,9 @@ def evaluate_motor_cable_candidates_in_network(
             else UNKNOWN
         )
         selected_pe_status = (
+            tesys_gv2_reference.get("pe_thermal_status", UNKNOWN)
+            if tesys_gv2_reference and tesys_gv2_reference.get("breaker_model")
+            else
             schneider_type1_reference.get("pe_thermal_status", UNKNOWN)
             if schneider_type1_reference and schneider_type1_reference.get("breaker_model")
             else schneider_ma_reference.get("pe_thermal_status", UNKNOWN)
@@ -935,6 +1013,11 @@ def evaluate_motor_cable_candidates_in_network(
                 if start_result
                 else UNKNOWN
             ),
+            "motor_terminal_starting_torque": (
+                start_result.outputs.get("motor_terminal_torque_check", UNKNOWN)
+                if start_result
+                else UNKNOWN
+            ),
         }
         governing_checks = [
             cable_decision_checks["running_voltage_drop"],
@@ -961,6 +1044,20 @@ def evaluate_motor_cable_candidates_in_network(
                 ("starting_voltage", "启动电压"),
             )
             if cable_decision_checks[code] == UNKNOWN
+            and (code != "starting_voltage" or start_result is not None)
+        ]
+
+        cable_controlling_checks = [
+            label
+            for code, label in (
+                ("running_voltage_drop", "运行电压降"),
+                ("terminal_three_phase_short_circuit", "末端三相短路电流"),
+                ("terminal_earth_fault", "末端相—PE故障电流"),
+                ("phase_thermal_with_selected_reference", "相导体短路热稳定"),
+                ("pe_thermal_with_selected_reference", "PE导体热稳定"),
+                ("starting_voltage", "启动时母线电压"),
+            )
+            if cable_decision_checks[code] != PASS
             and (code != "starting_voltage" or start_result is not None)
         ]
 
@@ -998,11 +1095,13 @@ def evaluate_motor_cable_candidates_in_network(
                 "cdm3e_motor_reference": cdm3e_motor_reference,
                 "schneider_type1_reference": schneider_type1_reference,
                 "schneider_ma_reference": schneider_ma_reference,
+                "tesys_gv2_reference": tesys_gv2_reference,
                 "control_product_reference": control_product_reference,
                 "starting_voltage": start_result.to_dict() if start_result else None,
                 "cable_decision_status": cable_decision_status,
                 "cable_decision_checks": cable_decision_checks,
                 "cable_pending_checks": cable_pending_checks,
+                "cable_controlling_checks": cable_controlling_checks,
             }
         product_schemes = _build_motor_product_scheme_candidates(
             candidate_result, control_product_reference

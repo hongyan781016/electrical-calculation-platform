@@ -103,6 +103,13 @@
     <div class="section-title"><div><p class="eyebrow">RECOMMENDATION</p><h2>当前推荐与采购参数</h2></div><span class="status-pill pending">{{ final_scheme.status }}</span></div>
     <p><strong>{{ final_scheme.status_label }}</strong></p>
     <p class="basis-note">{{ final_scheme.purchase_summary.design_basis }}；方案按现有样本的证据完整度自动收敛，不按品牌排序。</p>
+    {% if network_recommended_candidate.starting_voltage %}
+    <div class="alert warning"><strong>启动电压分开判定</strong><ul>
+      <li>配电母线：{{ network_recommended_candidate.starting_voltage.outputs.starting_bus_voltage_percent|round(2) }}% Un；{% if voltage_requirement.outputs.minimum_bus_voltage_percent is not none %}限值≥{{ voltage_requirement.outputs.minimum_bus_voltage_percent }}% Un，{% endif %}当前母线判定为“{{ network_recommended_candidate.starting_voltage.outputs.bus_voltage_check }}”。</li>
+      <li>电动机端子：{{ network_recommended_candidate.starting_voltage.outputs.starting_motor_terminal_voltage_percent|round(2) }}% Un；尚缺电动机转矩曲线和负载阻转矩，不能据母线限值代判启动成功。</li>
+      <li>容量法以启动前母线 {{ network_recommended_candidate.starting_voltage.outputs.voltage_reference.source_bus_voltage_pu }} p.u.、系统平均电压 {{ network_recommended_candidate.starting_voltage.outputs.voltage_reference.system_average_voltage_kv }} kV 计算；轻载时结果可能高于100%额定电压。</li>
+    </ul></div>
+    {% endif %}
     <div class="candidate-list">
       {% for purchase_item in final_scheme.purchase_summary['items'] %}
       <div>
@@ -166,7 +173,11 @@
       <article class="selection-card">
         <h3>{% if network_recommendation_level == 'network_checked' %}推荐截面：{% else %}首选基础截面：{% endif %}{{ primary_cable.cable_specification }}</h3>
         <p>修正后载流量 {{ primary_cable.corrected_ampacity_a|round(2) }} A；{% if primary_cable.running_voltage_drop_percent is not none %}运行压降 {{ primary_cable.running_voltage_drop_percent|round(3) }}%{% else %}运行压降待参数{% endif %}。</p>
-        <p><strong>选择理由：</strong>{% if network_recommendation_level == 'network_checked' %}这是按截面从小到大，第一个同时通过载流量、运行压降、末端故障电流、相线/PE热稳定及已启用启动电压校核的候选。{% else %}这是当前满足载流量和运行压降条件的最小基础候选。{% endif %}</p>
+        <p><strong>选择理由：</strong>{% if network_recommendation_level == 'network_checked' %}这是按截面从小到大，第一个同时通过载流量、运行压降、末端故障电流、相线/PE热稳定及启动母线电压校核的候选。{% else %}这是当前满足载流量和运行压降条件的最小基础候选。{% endif %}</p>
+        {% if network_result and network_result.outputs.recommended_candidate_position is not none and network_result.outputs.recommended_candidate_position > 0 %}
+        {% set rejected = network_result.outputs.candidates[network_result.outputs.recommended_candidate_position - 1] %}
+        <p><strong>为何不能再小：</strong>{{ rejected.cable.cable_specification }} 的控制项为 {{ rejected.cable_controlling_checks|join('、') }}；不是仅按运行电流放大截面。</p>
+        {% endif %}
         <p class="basis-note">{% if network_recommendation_level == 'network_checked' %}可作为当前计算条件下的推荐设计截面；最终采购仍应绑定实际保护器件和施工条件。{% else %}短路、相—PE故障或热稳定未闭合，暂不能作为最终采购规格。若采用YJV三芯＋独立PE，还须取得独立PE的截面与相对敷设几何参数；使用推荐的四芯3相＋PE结构可自动完成现有表列路径。{% endif %}</p>
       </article>
     </div>
@@ -285,7 +296,7 @@
         <p>末端最小相—PE故障：{% if item.chain.outputs.terminal_earth_fault_current_a is defined and item.chain.outputs.terminal_earth_fault_current_a is not none %}{{ item.chain.outputs.terminal_earth_fault_current_a|round(2) }} A{% else %}无法判断{% endif %}</p>
         <p>相导体允许最长切除：{% if item.phase_thermal_constraint.outputs.maximum_permitted_clearing_time_s is defined %}{{ item.phase_thermal_constraint.outputs.maximum_permitted_clearing_time_s }} s{% else %}无法判断{% endif %}</p>
         <p>PE允许最长切除：{% if item.pe_thermal_constraint and item.pe_thermal_constraint.outputs.maximum_permitted_clearing_time_s is defined %}{{ item.pe_thermal_constraint.outputs.maximum_permitted_clearing_time_s }} s{% else %}无法判断{% endif %}</p>
-        <p>启动母线/端子电压：{% if item.starting_voltage and item.starting_voltage.outputs.starting_bus_voltage_percent is defined and item.starting_voltage.outputs.starting_motor_terminal_voltage_percent is defined %}{{ item.starting_voltage.outputs.starting_bus_voltage_percent|round(2) }}% / {{ item.starting_voltage.outputs.starting_motor_terminal_voltage_percent|round(2) }}%{% else %}无法判断{% endif %}</p>
+        <p>启动母线/端子电压：{% if item.starting_voltage and item.starting_voltage.outputs.starting_bus_voltage_percent is defined and item.starting_voltage.outputs.starting_motor_terminal_voltage_percent is defined %}{{ item.starting_voltage.outputs.starting_bus_voltage_percent|round(2) }}%（母线{{ item.starting_voltage.outputs.bus_voltage_check }}） / {{ item.starting_voltage.outputs.starting_motor_terminal_voltage_percent|round(2) }}%（端子转矩待核对）{% else %}无法判断{% endif %}</p>
         <p><strong>综合判定：</strong>{{ item.cable_decision_status }}{% if item.cable_pending_checks %}；尚缺 {{ item.cable_pending_checks|join('、') }}{% endif %}</p>
         <details class="advanced-fields"><summary>查看断路器参数及专业校核依据</summary>
         {% if item.breaker_requirements %}
