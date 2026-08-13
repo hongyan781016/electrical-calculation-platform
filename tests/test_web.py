@@ -26,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.5.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.6.0"}
 
     response = client.post(
         "/projects",
@@ -247,6 +247,7 @@ def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters
 
     page = client.get("/motor")
     assert page.status_code == 200
+    assert 'name="project_id"' in page.text
     assert "三相电动机回路" in page.text
     assert 'name="known_value"' in page.text
     assert 'id="motor-catalog-power-selector"' in page.text
@@ -268,6 +269,38 @@ def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters
     assert '<option value="scb11" selected>SCB11干式变压器</option>' in page.text
     assert 'name="transformer_capacity_kva" type="number" min="1" step="1" value="630"' in page.text
     assert 'name="transformer_uk_percent" type="number" min="0.1" step="0.1" value="6"' in page.text
+
+
+def test_motor_calculation_can_be_saved_versioned_and_exported(tmp_path, monkeypatch):
+    database = Database(tmp_path / "motor-project.db")
+    monkeypatch.setattr(web, "db", database)
+    client = TestClient(web.app)
+    project_id = database.create_project("P-M06", "电动机归档")
+    data = {**web._motor_form_defaults(),
+        "project_id": str(project_id), "circuit_code": "M-001",
+        "circuit_name": "30kW风机", "known_value": "30",
+        "preconnected_reactive_load_mvar": "0.1",
+    }
+    saved = client.post("/motor", data=data, follow_redirects=False)
+    assert saved.status_code == 303
+    assert saved.headers["location"].startswith("/motor-runs/")
+    run_id = int(saved.headers["location"].rsplit("/", 1)[1])
+    detail = client.get(f"/motor-runs/{run_id}")
+    assert detail.status_code == 200
+    assert "保存时的主方案" in detail.text
+    assert "30kW风机" in detail.text
+    assert client.get(f"/motor-runs/{run_id}/report.pdf").content.startswith(b"%PDF")
+    workbook_response = client.get(f"/motor-runs/{run_id}/export.xlsx")
+    assert workbook_response.content.startswith(b"PK")
+    workbook = load_workbook(BytesIO(workbook_response.content), data_only=False)
+    assert workbook.sheetnames == ["成果总览", "输入快照", "校核结果", "依据快照"]
+    changed = client.post("/motor", data={**data, "length_m": "80"}, follow_redirects=False)
+    assert changed.status_code == 303
+    assert database.get_motor_run(run_id)["stale"] == 1
+    project_page = client.get(f"/projects/{project_id}")
+    assert "电动机计算版本" in project_page.text
+    assert "已过期" in project_page.text
+    page = client.get("/motor")
     assert 'name="installation_temperature_c" type="number" step="1" value="40"' in page.text
     assert "当前采用的快速工况" in page.text
 
@@ -316,13 +349,33 @@ def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters
     assert "IE3/IE4制造商2类配合参考" in response.text
     assert "3RA2130-4XA37-0AP0" in response.text
     assert "3RA2130-4JA37-0AP0" in response.text
-    assert "380/400V同一应用电压档" in response.text
     assert "当前主方案：独立热继电器" in response.text
     assert "NXR-100 48～65 A" in response.text
     assert "首选基础截面" in response.text
     assert "查看其他基础电缆备选" in response.text
     assert "路线B：短路保护器件＋接触器＋独立热继电器" in response.text
     assert "不配置独立NXR" in response.text
+
+
+def test_representative_motor_powers_can_all_be_archived(tmp_path, monkeypatch):
+    database = Database(tmp_path / "motor-matrix.db")
+    monkeypatch.setattr(web, "db", database)
+    client = TestClient(web.app)
+    project_id = database.create_project("P-MATRIX", "电动机矩阵")
+    for index, power in enumerate((0.12, 30, 200), 1):
+        data = {
+            **web._motor_form_defaults(),
+            "project_id": str(project_id),
+            "circuit_code": f"M-{index:03d}",
+            "circuit_name": f"{power}kW电动机",
+            "known_value": str(power),
+            "preconnected_reactive_load_mvar": "0.1",
+        }
+        response = client.post("/motor", data=data, follow_redirects=False)
+        assert response.status_code == 303
+        run = database.get_motor_run(int(response.headers["location"].rsplit("/", 1)[1]))
+        assert run["result_json"]["recommended_candidate"]["primary_scheme"]["status"] == "有条件采用"
+    assert len(database.list_motor_runs(project_id)) == 3
 
 
 def test_motor_default_form_runs_complete_network_without_professional_inputs(

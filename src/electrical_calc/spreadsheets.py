@@ -419,6 +419,32 @@ def create_network_run_export(run: dict[str, Any]) -> bytes:
     return stream.getvalue()
 
 
+def create_motor_run_export(run: dict[str, Any]) -> bytes:
+    """从不可变电动机快照生成Excel成果。"""
+    wb = Workbook()
+    summary = wb.active; summary.title = "成果总览"
+    result = run["result_json"]; load = result.get("load", {}).get("outputs", {})
+    candidate = result.get("recommended_candidate") or {}; scheme = candidate.get("primary_scheme") or {}
+    summary.append(["项目", run["project_name"], "回路", run["input_snapshot"].get("circuit_code")])
+    summary.append(["计算版本", f"V{run['motor_revision']} / #{run['id']}", "引擎", run["engine_version"]])
+    summary.append(["正式状态", run["status"], "暂算状态", run["provisional_status"]])
+    summary.append(["额定电流(A)", load.get("rated_current_a"), "启动电流(A)", load.get("starting_current_a")])
+    summary.append(["主电缆", candidate.get("cable", {}).get("cable_specification"), "保护器", scheme.get("breaker")])
+    summary.append(["接触器", scheme.get("contactor"), "过载保护", scheme.get("overload_device")])
+    _fit_columns(summary, [20, 52, 20, 52])
+    inputs=wb.create_sheet("输入快照"); inputs.append(["字段","值"])
+    for key,value in run["input_snapshot"].items(): inputs.append([key,value])
+    _format_table(inputs,2); _fit_columns(inputs,[38,60])
+    checks=wb.create_sheet("校核结果"); checks.append(["校核","结果"])
+    for item in scheme.get("closed_checks",[]): checks.append([item,"已闭合"])
+    for item in scheme.get("professional_pending",[]): checks.append([item,"待深化"])
+    _format_table(checks,2); _fit_columns(checks,[55,20])
+    rules=wb.create_sheet("依据快照"); rules.append(["编号","状态","文件","条文/表号","页码"])
+    for code,rule in run["rule_snapshot"].items(): rules.append([code,rule.get("status"),rule.get("document_name"),rule.get("clause_no"),rule.get("page_no")])
+    _format_table(rules,5); _fit_columns(rules,[38,16,45,30,28])
+    stream=BytesIO(); wb.save(stream); return stream.getvalue()
+
+
 def _format_table(ws, last_col: int) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(last_col)}{max(ws.max_row, 1)}"

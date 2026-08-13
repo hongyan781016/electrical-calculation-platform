@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}电动机版本 #{{ run.id }} · 电气计算台{% endblock %}
+{% block content %}
+<nav class="breadcrumb"><a href="/">项目</a><span>/</span><a href="/projects/{{ run.project_id }}">{{ run.project_code }}</a><span>/</span><strong>电动机 V{{ run.motor_revision }}</strong></nav>
+<section class="project-head"><div><p class="eyebrow">MOTOR VERSION #{{ run.id }}</p><h1>{{ run.input_snapshot.circuit_name }}</h1><p>{{ run.input_snapshot.circuit_code }} · {{ run.created_at }} · 引擎 {{ run.engine_version }}</p></div><div class="actions"><a class="button secondary" href="/motor-runs/{{ run.id }}/report.pdf">导出 PDF</a><a class="button secondary" href="/motor-runs/{{ run.id }}/export.xlsx">导出 Excel</a></div></section>
+{% if run.stale %}<div class="alert danger"><strong>此版本已过期</strong><span>同一回路输入已经变化。本记录仍保留原输入和原结果。</span></div>{% endif %}
+{% set result = run.result_json %}{% set candidate = result.recommended_candidate %}{% set scheme = candidate.primary_scheme if candidate else none %}
+<section class="metrics"><div><span>修订</span><strong>V{{ run.motor_revision }}</strong></div><div><span>额定电流</span><strong>{{ result.load.outputs.rated_current_a|round(3) }} A</strong></div><div><span>启动电流</span><strong>{{ result.load.outputs.starting_current_a|round(3) }} A</strong></div><div><span>暂算状态</span><strong>{{ run.provisional_status }}</strong></div></section>
+<div class="detail-grid"><section>
+  <div class="section-title"><div><p class="eyebrow">FROZEN PRIMARY DESIGN</p><h2>保存时的主方案</h2></div></div>
+  {% if scheme %}<div class="selection-grid"><article class="selection-card"><h3>电缆</h3><p>{{ candidate.cable.cable_specification }}</p><p>Iz {{ candidate.cable.corrected_ampacity_a|round(2) }} A</p></article><article class="selection-card"><h3>保护与控制</h3><p>{{ scheme.breaker }}</p><p>{{ scheme.contactor }}</p><p>{{ scheme.overload_device }}</p></article></div>{% endif %}
+  {% if candidate.starting_voltage %}<div class="selection-grid"><article class="selection-card"><h3>启动母线</h3><p>{{ candidate.starting_voltage.outputs.starting_bus_voltage_percent|round(2) }}% Un · {{ candidate.starting_voltage.outputs.bus_voltage_check }}</p></article><article class="selection-card"><h3>电动机端子</h3><p>{{ candidate.starting_voltage.outputs.starting_motor_terminal_voltage_percent|round(2) }}% Un</p><p>启动转矩仍须机械负载资料。</p></article></div>{% endif %}
+  {% if scheme and scheme.professional_pending %}<div class="alert warning"><strong>保存时仍需深化</strong><ul>{% for item in scheme.professional_pending %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+</section><aside class="side-stack"><section class="panel"><p class="eyebrow">INPUT SNAPSHOT</p><h2>输入快照</h2><dl class="kv">{% for key,value in run.input_snapshot.items() %}<div><dt>{{ key }}</dt><dd>{{ value or '—' }}</dd></div>{% endfor %}</dl></section><section class="panel"><p class="eyebrow">RULE SNAPSHOT</p><h2>依据快照</h2>{% for code,rule in run.rule_snapshot.items() %}<div class="rule-mini"><strong>{{ code }}</strong><p>{{ rule.document_name }} · {{ rule.clause_no }} · {{ rule.page_no }}</p></div>{% endfor %}</section></aside></div>
+{% endblock %}

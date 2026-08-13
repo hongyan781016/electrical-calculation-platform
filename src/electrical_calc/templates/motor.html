@@ -15,6 +15,14 @@
 <form method="post" action="/motor" class="circuit-wizard">
   <input id="motor-cable-path-adjustment" name="cable_path_adjustment" type="hidden" value="{{ form.cable_path_adjustment }}">
   <section class="panel wizard-section">
+    <div class="wizard-title"><span class="wizard-number">00</span><div><p class="eyebrow">ARCHIVE</p><h2>计算与归档</h2></div></div>
+    <div class="wizard-grid three">
+      <label>保存到项目（可选）<select name="project_id"><option value="">仅计算，不保存</option>{% for project in projects %}<option value="{{ project.id }}" {% if form.project_id|string == project.id|string %}selected{% endif %}>{{ project.code }} · {{ project.name }}</option>{% endfor %}</select><small>选择项目后，本次计算形成不可覆盖版本。</small></label>
+      <label>回路编号<input name="circuit_code" value="{{ form.circuit_code }}"></label>
+      <label>回路名称<input name="circuit_name" value="{{ form.circuit_name }}"></label>
+    </div>
+  </section>
+  <section class="panel wizard-section">
     <div class="wizard-title"><span class="wizard-number">01</span><div><p class="eyebrow">NAMEPLATE</p><h2>你知道什么</h2></div></div>
     <div class="wizard-grid four">
       <label>已知量
