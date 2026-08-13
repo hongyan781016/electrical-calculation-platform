@@ -115,6 +115,10 @@ def test_exact_motor_catalog_row_derives_motor_parameters_and_application():
     assert result.errors == ()
     assert result.derived["efficiency"] == 0.936
     assert result.derived["power_factor"] == 0.84
+    assert result.derived["motor_calculation"]["outputs"]["rated_current_a"] == pytest.approx(
+        result.derived["design_current_a"]
+    )
+    assert result.derived["motor_calculation"]["outputs"]["starting_current_a"] is not None
     assert result.radial_request.circuit.load.circuit_application == CircuitApplication.MOTOR_FINAL
 
 

@@ -100,6 +100,26 @@ def test_complete_network_is_unique_per_project(tmp_path):
     assert len(database.list_network_runs(project_id)) == 0
 
 
+def test_motor_versions_are_immutable_per_project_and_circuit(tmp_path):
+    database = Database(tmp_path / "motor-versions.db")
+    project_id = database.create_project("P-MOTOR", "电动机项目")
+    first_input = {"circuit_code": "M-001", "known_value": "30", "length_m": "50"}
+    motor = database.save_project_motor(project_id, first_input)
+    run_id = database.create_motor_run(
+        project_id, motor, engine_version="0.6.0", input_snapshot=first_input,
+        result={"status": "无法判断", "provisional_status": "通过", "warnings": []},
+        rule_snapshot={},
+    )
+    unchanged = database.save_project_motor(project_id, dict(first_input))
+    assert unchanged["revision"] == 1
+    assert database.get_motor_run(run_id)["stale"] == 0
+    changed = database.save_project_motor(project_id, dict(first_input, length_m="80"))
+    assert changed["revision"] == 2
+    assert changed["changed_fields"] == ["length_m"]
+    assert database.get_motor_run(run_id)["stale"] == 1
+    assert database.get_motor_run(run_id)["input_snapshot"]["length_m"] == "50"
+
+
 def test_transformer_lv_short_circuit_rule_is_seeded_idempotently(tmp_path):
     path = tmp_path / "rules.db"
     first = Database(path)

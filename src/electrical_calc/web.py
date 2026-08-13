@@ -73,9 +73,10 @@ from .pole_configuration import (
     evaluate_pole_and_neutral_configuration,
 )
 from .radial_circuit_service import calculate_radial_complete_circuit
-from .reports import NETWORK_INPUT_LABELS, create_network_run_pdf, create_run_pdf
+from .reports import NETWORK_INPUT_LABELS, create_motor_run_pdf, create_network_run_pdf, create_run_pdf
 from .spreadsheets import (
     create_input_template,
+    create_motor_run_export,
     create_network_run_export,
     create_project_export,
     parse_circuit_workbook,
@@ -160,6 +161,9 @@ def quick_page(request: Request):
 
 def _motor_form_defaults() -> dict[str, str]:
     return {
+        "project_id": "",
+        "circuit_code": "M-001",
+        "circuit_name": "电动机回路",
         "known_basis": "rated_output_power_kw",
         "known_value": "30",
         "rated_voltage_v": "380",
@@ -206,6 +210,7 @@ def motor_page(request: Request):
             "cable_configuration_notice": None,
             "motor_catalog_powers_kw": AVAILABLE_RATED_OUTPUT_POWERS_KW,
             "motor_complete_selection_powers_kw": COMPLETE_SELECTION_POWERS_KW,
+            "projects": db.list_projects(),
         },
     )
 
@@ -520,22 +525,64 @@ async def motor_calculate(request: Request):
             except ValueError:
                 errors.append("变压器及上级系统条件必须填写有效数值。")
 
+    catalog_dict = catalog_result.to_dict() if catalog_result else None
+    load_dict = load_result.to_dict() if load_result else None
+    selection_dict = selection_result.to_dict() if selection_result else None
+    cable_dict = cable_result.to_dict() if cable_result else None
+    network_dict = network_result.to_dict() if network_result else None
+    if form["project_id"] and not errors and network_dict and network_recommended_candidate:
+        try:
+            project_id = int(form["project_id"])
+        except ValueError:
+            errors.append("保存项目无效。")
+        else:
+            if not db.get_project(project_id):
+                errors.append("保存项目不存在。")
+            else:
+                snapshot = {
+                    "catalog": catalog_dict,
+                    "load": load_dict,
+                    "selection": selection_dict,
+                    "cable": cable_dict,
+                    "network": network_dict,
+                    "recommended_candidate": network_recommended_candidate,
+                    "motor_parameter_source": motor_parameter_source,
+                    "motor_parameter_values": {
+                        "efficiency": efficiency,
+                        "power_factor": power_factor,
+                        "locked_rotor_current_ratio": locked_ratio,
+                    },
+                    "status": network_dict.get("status", "无法判断"),
+                    "provisional_status": network_dict.get("provisional_status", "无法判断"),
+                    "warnings": list(network_dict.get("warnings", [])),
+                }
+                motor = db.save_project_motor(project_id, form)
+                rule_codes = _collect_rule_codes(snapshot)
+                snapshot_rules = {
+                    code: rules[code] for code in sorted(rule_codes) if code in rules
+                }
+                run_id = db.create_motor_run(
+                    project_id, motor, engine_version=__version__,
+                    input_snapshot=form, result=snapshot, rule_snapshot=snapshot_rules,
+                )
+                return RedirectResponse(f"/motor-runs/{run_id}", status_code=303)
+
     return templates.TemplateResponse(
         request=request,
         name="motor.html",
         context={
             "form": form,
             "errors": errors,
-            "catalog_result": catalog_result.to_dict() if catalog_result else None,
-            "load_result": load_result.to_dict() if load_result else None,
+            "catalog_result": catalog_dict,
+            "load_result": load_dict,
             "voltage_requirement": (
                 voltage_requirement.to_dict() if voltage_requirement else None
             ),
             "selection_result": (
-                selection_result.to_dict() if selection_result else None
+                selection_dict
             ),
-            "cable_result": cable_result.to_dict() if cable_result else None,
-            "network_result": network_result.to_dict() if network_result else None,
+            "cable_result": cable_dict,
+            "network_result": network_dict,
             "network_recommended_candidate": network_recommended_candidate,
             "network_recommendation_level": network_recommendation_level,
             "network_fault_checks_complete": network_fault_checks_complete,
@@ -550,6 +597,7 @@ async def motor_calculate(request: Request):
                 "power_factor": power_factor,
                 "locked_rotor_current_ratio": locked_ratio,
             },
+            "projects": db.list_projects(),
         },
     )
 
@@ -1665,6 +1713,7 @@ def project_page(request: Request, project_id: int, message: str = ""):
             "runs": db.list_runs(project_id),
             "network": network,
             "network_runs": db.list_network_runs(project_id),
+            "motor_runs": db.list_motor_runs(project_id),
             "message": message,
         },
     )
@@ -1759,6 +1808,34 @@ def export_network_run_excel(run_id: int):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
+
+
+@app.get("/motor-runs/{run_id}", response_class=HTMLResponse)
+def motor_run_page(request: Request, run_id: int):
+    run = db.get_motor_run(run_id)
+    if not run:
+        raise HTTPException(404, "电动机计算记录不存在")
+    return templates.TemplateResponse(request=request, name="motor_run.html", context={"run": run})
+
+
+@app.get("/motor-runs/{run_id}/report.pdf")
+def export_motor_run_pdf(run_id: int):
+    run = db.get_motor_run(run_id)
+    if not run:
+        raise HTTPException(404, "电动机计算记录不存在")
+    content = create_motor_run_pdf(run)
+    filename = f"{run['project_code']}-{run['input_snapshot'].get('circuit_code','电动机')}-V{run['motor_revision']}-计算书.pdf"
+    return Response(content, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
+
+
+@app.get("/motor-runs/{run_id}/export.xlsx")
+def export_motor_run_excel(run_id: int):
+    run = db.get_motor_run(run_id)
+    if not run:
+        raise HTTPException(404, "电动机计算记录不存在")
+    content = create_motor_run_export(run)
+    filename = f"{run['project_code']}-{run['input_snapshot'].get('circuit_code','电动机')}-V{run['motor_revision']}-成果表.xlsx"
+    return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
 
 
 def _collect_rule_codes(payload: object) -> set[str]:

@@ -367,6 +367,32 @@ def create_network_run_pdf(run: dict[str, Any]) -> bytes:
     return stream.getvalue()
 
 
+def create_motor_run_pdf(run: dict[str, Any]) -> bytes:
+    """从不可变电动机快照生成简明计算书。"""
+    stream = BytesIO()
+    result = run["result_json"]
+    load = result.get("load", {}).get("outputs", {})
+    candidate = result.get("recommended_candidate") or {}
+    scheme = candidate.get("primary_scheme") or {}
+    doc = SimpleDocTemplate(stream, pagesize=A4, rightMargin=16*mm, leftMargin=16*mm, topMargin=17*mm, bottomMargin=17*mm)
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle("motor-title", parent=styles["Title"], fontName=FONT, fontSize=19, leading=26, textColor=colors.HexColor("#17324D"), alignment=TA_LEFT)
+    heading = ParagraphStyle("motor-heading", parent=styles["Heading2"], fontName=FONT, fontSize=12, leading=18, textColor=colors.HexColor("#17324D"))
+    body = ParagraphStyle("motor-body", parent=styles["BodyText"], fontName=FONT, fontSize=9, leading=14)
+    story: list[Any] = [Paragraph("三相电动机回路计算书", title), Paragraph(f"{_e(run['project_code'])} / {_e(run['project_name'])} · {_e(run['input_snapshot'].get('circuit_code'))}", body), Spacer(1, 4*mm)]
+    story.append(_table([["计算版本", f"V{run['motor_revision']} / #{run['id']}", "引擎", run['engine_version']], ["正式状态", run['status'], "暂算状态", run['provisional_status']], ["额定电流(A)", load.get("rated_current_a", ""), "启动电流(A)", load.get("starting_current_a", "")]], [30*mm, 51*mm, 30*mm, 51*mm]))
+    story.extend([Paragraph("一、输入快照", heading), _table([["字段", "值"]] + [[key, value] for key,value in run["input_snapshot"].items()], [63*mm, 99*mm], header=True), Paragraph("二、主方案", heading)])
+    story.append(_table([["电缆", candidate.get("cable", {}).get("cable_specification", "")], ["短路保护", scheme.get("breaker", "")], ["接触器", scheme.get("contactor", "")], ["过载保护", scheme.get("overload_device", "")]], [40*mm, 122*mm]))
+    starting = candidate.get("starting_voltage", {}).get("outputs", {})
+    story.extend([Paragraph("三、启动与故障校核", heading), _table([["启动母线电压(%)", starting.get("starting_bus_voltage_percent", "")], ["电动机端子电压(%)", starting.get("starting_motor_terminal_voltage_percent", "")], ["安装点最大短路(kA)", candidate.get("chain", {}).get("outputs", {}).get("node_results", [{}])[0].get("three_phase_short_circuit_ka", "")], ["末端相-PE故障(A)", candidate.get("chain", {}).get("outputs", {}).get("terminal_earth_fault_current_a", "")]], [63*mm,99*mm])])
+    story.append(Paragraph("四、未闭合项", heading))
+    for item in scheme.get("professional_pending", []): story.append(Paragraph("- " + _e(item), body))
+    story.append(PageBreak()); story.append(Paragraph("五、计算依据快照", heading))
+    for code, rule in run["rule_snapshot"].items(): story.append(Paragraph(f"{_e(code)} · {_e(rule.get('document_name',''))} · {_e(rule.get('clause_no',''))} · {_e(rule.get('page_no',''))}", body))
+    doc.build(story)
+    return stream.getvalue()
+
+
 def _table(rows: list[list[Any]], widths: list[float], header: bool = False) -> Table:
     normalized = [
         [Paragraph(_e(value), ParagraphStyle("cell", fontName=FONT, fontSize=8.5, leading=12)) for value in row]

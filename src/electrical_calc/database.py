@@ -137,6 +137,35 @@ class Database:
                     ON network_calculation_runs(project_id,id DESC);
                 CREATE INDEX IF NOT EXISTS idx_network_runs_network
                     ON network_calculation_runs(network_id,network_revision);
+                CREATE TABLE IF NOT EXISTS project_motors (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    circuit_code TEXT NOT NULL,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    input_hash TEXT NOT NULL,
+                    input_json TEXT NOT NULL,
+                    changed_fields_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(project_id,circuit_code)
+                );
+                CREATE TABLE IF NOT EXISTS motor_calculation_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    motor_id INTEGER NOT NULL REFERENCES project_motors(id) ON DELETE CASCADE,
+                    motor_revision INTEGER NOT NULL,
+                    engine_version TEXT NOT NULL,
+                    input_snapshot TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    rule_snapshot TEXT NOT NULL,
+                    warnings_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    provisional_status TEXT NOT NULL,
+                    stale INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_motor_runs_project
+                    ON motor_calculation_runs(project_id,id DESC);
                 """
             )
             count = conn.execute("SELECT COUNT(*) FROM reference_rules").fetchone()[0]
@@ -676,5 +705,82 @@ class Database:
                 "input_snapshot", "derived_json", "audit_json", "result_json",
                 "rule_snapshot", "warnings_json",
             ):
+                data[key] = json.loads(data[key])
+            return data
+
+    def save_project_motor(
+        self, project_id: int, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        serialized = self._canonical_json(input_data)
+        digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        code = str(input_data.get("circuit_code", "M-001")).strip()
+        now = utc_now()
+        with self.connect() as conn:
+            existing = conn.execute(
+                "SELECT * FROM project_motors WHERE project_id=? AND circuit_code=?",
+                (project_id, code),
+            ).fetchone()
+            if existing and existing["input_hash"] == digest:
+                return {"id": int(existing["id"]), "revision": int(existing["revision"]), "changed": False, "changed_fields": []}
+            if existing:
+                previous = json.loads(existing["input_json"])
+                changed = sorted(
+                    key for key in set(previous) | set(input_data)
+                    if previous.get(key) != input_data.get(key)
+                )
+                revision = int(existing["revision"]) + 1
+                conn.execute(
+                    "UPDATE project_motors SET revision=?,input_hash=?,input_json=?,changed_fields_json=?,updated_at=? WHERE id=?",
+                    (revision, digest, serialized, json.dumps(changed, ensure_ascii=False), now, existing["id"]),
+                )
+                conn.execute(
+                    "UPDATE motor_calculation_runs SET stale=1 WHERE motor_id=?",
+                    (existing["id"],),
+                )
+                motor_id = int(existing["id"])
+            else:
+                revision = 1
+                changed = sorted(input_data)
+                cursor = conn.execute(
+                    "INSERT INTO project_motors (project_id,circuit_code,revision,input_hash,input_json,changed_fields_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (project_id, code, revision, digest, serialized, json.dumps(changed, ensure_ascii=False), now, now),
+                )
+                motor_id = int(cursor.lastrowid)
+            conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (now, project_id))
+            return {"id": motor_id, "revision": revision, "changed": True, "changed_fields": changed}
+
+    def create_motor_run(
+        self, project_id: int, motor: dict[str, Any], *, engine_version: str,
+        input_snapshot: dict[str, Any], result: dict[str, Any],
+        rule_snapshot: dict[str, dict[str, Any]],
+    ) -> int:
+        warnings = list(result.get("warnings", []))
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "INSERT INTO motor_calculation_runs (project_id,motor_id,motor_revision,engine_version,input_snapshot,result_json,rule_snapshot,warnings_json,status,provisional_status,stale,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,0,?)",
+                (project_id, motor["id"], motor["revision"], engine_version,
+                 self._canonical_json(input_snapshot), self._canonical_json(result),
+                 self._canonical_json(rule_snapshot), json.dumps(warnings, ensure_ascii=False),
+                 result.get("status", "无法判断"), result.get("provisional_status", "无法判断"), utc_now()),
+            )
+            return int(cursor.lastrowid)
+
+    def list_motor_runs(self, project_id: int, limit: int = 100) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT * FROM motor_calculation_runs WHERE project_id=? ORDER BY id DESC LIMIT ?",
+                (project_id, limit),
+            ).fetchall()]
+
+    def get_motor_run(self, run_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT r.*,p.code AS project_code,p.name AS project_name FROM motor_calculation_runs r JOIN projects p ON p.id=r.project_id WHERE r.id=?",
+                (run_id,),
+            ).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            for key in ("input_snapshot", "result_json", "rule_snapshot", "warnings_json"):
                 data[key] = json.loads(data[key])
             return data

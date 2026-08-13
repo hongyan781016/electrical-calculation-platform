@@ -17,6 +17,12 @@
   <div><span>计算记录</span><strong>{{ runs|length }}</strong></div>
   <div><span>有效记录</span><strong>{{ runs|rejectattr('stale')|list|length }}</strong></div>
   <div><span>完整回路版本</span><strong>{{ network_runs|length }}</strong></div>
+  <div><span>电动机版本</span><strong>{{ motor_runs|length }}</strong></div>
+</section>
+
+<section class="panel candidate-panel">
+  <div class="section-title"><div><p class="eyebrow">MOTOR CIRCUITS</p><h2>电动机计算版本</h2></div><a class="button" href="/motor">新建电动机计算</a></div>
+  {% if motor_runs %}<div class="run-list">{% for run in motor_runs %}<a href="/motor-runs/{{ run.id }}" class="run-row {% if run.stale %}stale{% endif %}"><span class="status-dot status-{{ run.status }}"></span><div><strong>电动机 V{{ run.motor_revision }} · #{{ run.id }}</strong><small>{{ run.created_at }} · 引擎 {{ run.engine_version }}</small></div><span class="tag">{{ '已过期' if run.stale else run.provisional_status }}</span><span>→</span></a>{% endfor %}</div>{% else %}<p class="muted">尚未保存电动机计算。</p>{% endif %}
 </section>
 
 <section class="panel candidate-panel">

@@ -32,8 +32,9 @@ from .complete_circuit import (
 )
 from .complete_circuit_engine import ResolvedSegmentLoadFlow
 from .drawing_audit import DrawingCircuitAuditRequest, InstalledBreaker, InstalledCable
-from .motor import MotorCatalogQuery
+from .motor import MotorCatalogQuery, MotorKnownBasis, MotorLoadInput
 from .motor_catalog import resolve_motor_reference_parameters
+from .motor_engine import calculate_motor_load
 from .radial_circuit_service import RadialCircuitCalculationRequest
 
 
@@ -172,6 +173,7 @@ def build_circuit_network_requests(
     efficiency: float | None = None
     load_power_factor = data.power_factor
     motor_reference: dict[str, Any] | None = None
+    motor_calculation: dict[str, Any] | None = None
     if data.load_kind == TerminalLoadKind.MOTOR:
         if data.load_basis != InputBasis.ACTIVE_POWER_KW:
             errors.append("完整回路中的目录电动机当前必须按铭牌输出功率kW输入。")
@@ -187,6 +189,19 @@ def build_circuit_network_requests(
                 efficiency = float(catalog.outputs["efficiency"])
                 load_power_factor = float(catalog.outputs["power_factor"])
                 motor_reference = catalog.outputs
+                motor_calculation = calculate_motor_load(
+                    MotorLoadInput(
+                        known_basis=MotorKnownBasis.RATED_OUTPUT_POWER_KW,
+                        known_value=data.load_value,
+                        rated_voltage_v=data.system_voltage_v,
+                        power_factor=load_power_factor,
+                        efficiency=efficiency,
+                        locked_rotor_current_ratio=float(
+                            catalog.outputs["locked_rotor_current_ratio"]
+                        ),
+                    ),
+                    rules,
+                ).to_dict()
                 notices.append(
                     "电动机效率、功率因数和启动倍数来自厂家目录精确功率行；正式复核仍以铭牌为准。"
                 )
@@ -194,12 +209,13 @@ def build_circuit_network_requests(
     if errors:
         return NetworkBuildResult(None, None, tuple(errors), tuple(notices), {})
 
-    design_current_a = _design_current(
-        data.load_basis,
-        data.load_value,
-        data.system_voltage_v,
-        load_power_factor,
-        efficiency,
+    design_current_a = (
+        float(motor_calculation["outputs"]["rated_current_a"])
+        if motor_calculation is not None
+        else _design_current(
+            data.load_basis, data.load_value, data.system_voltage_v,
+            load_power_factor, efficiency,
+        )
     )
     application = (
         CircuitApplication.MOTOR_FINAL
@@ -383,6 +399,7 @@ def build_circuit_network_requests(
         "efficiency": efficiency,
         "upstream_reference_capacity_mva": data.upstream_short_circuit_capacity_mva,
         "motor_reference": motor_reference,
+        "motor_calculation": motor_calculation,
     }
     notices.append("上级系统短路容量用于折算等值阻抗，不要求用户填写R/X。")
     return NetworkBuildResult(radial, audit, (), tuple(notices), derived)
