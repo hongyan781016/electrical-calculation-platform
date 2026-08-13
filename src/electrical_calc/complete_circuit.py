@@ -79,6 +79,7 @@ class SegmentType(StringEnum):
     CABLE = "cable"
     INSULATED_WIRE = "insulated_wire"
     BUSWAY = "busway"
+    INTERNAL_CONNECTION = "internal_connection"
 
 
 class UpstreamNetworkMode(StringEnum):
@@ -473,12 +474,11 @@ def validate_complete_circuit(circuit: CompleteCircuit) -> tuple[ValidationIssue
             )
         )
     for index, segment in enumerate(segments):
-        _positive(
-            issues,
-            segment.length_m,
-            f"segments.{segment.id}.length_m",
-            f"线路段{segment.id}长度",
-        )
+        if segment.segment_type == SegmentType.INTERNAL_CONNECTION:
+            if segment.length_m != 0:
+                issues.append(ValidationIssue("field.invalid", f"segments.{segment.id}.length_m", "柜内连接边界长度必须为0。"))
+        else:
+            _positive(issues, segment.length_m, f"segments.{segment.id}.length_m", f"线路段{segment.id}长度")
         if not segment.installation_scenario.strip():
             issues.append(
                 ValidationIssue(
@@ -487,7 +487,7 @@ def validate_complete_circuit(circuit: CompleteCircuit) -> tuple[ValidationIssue
                     f"线路段{segment.id}必须明确敷设场景。",
                 )
             )
-        if segment.segment_type != SegmentType.BUSWAY and not (
+        if segment.segment_type not in {SegmentType.BUSWAY, SegmentType.INTERNAL_CONNECTION} and not (
             segment.conductor_family or ""
         ).strip():
             issues.append(

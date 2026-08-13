@@ -21,6 +21,34 @@
 @media(max-width:800px){.role-options,.wizard-grid.three,.wizard-grid.four{grid-template-columns:repeat(2,1fr)}.workflow-strip{grid-template-columns:repeat(2,1fr)}.circuit-results,.voltage-result{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.role-options,.wizard-grid.three,.wizard-grid.four,.workflow-strip,.circuit-results,.voltage-result{grid-template-columns:1fr}.calculate-button{width:100%}}
 
+/* Drawing audit has three semantic columns: number, heading and form body.
+   Keep fields readable and wrap them instead of creating a squeezed implicit column. */
+.drawing-audit-form .wizard-section{grid-template-columns:40px 230px minmax(0,1fr);column-gap:22px;row-gap:18px}
+.drawing-audit-form .wizard-section>.wizard-index{font:500 15px Consolas;color:var(--navy);padding-top:3px}
+.drawing-audit-form .wizard-section>div:nth-child(2){min-width:0}
+.drawing-audit-form .wizard-section>div:nth-child(2) h2{margin-bottom:0}
+.drawing-audit-form .wizard-section>div:nth-child(3){min-width:0}
+.drawing-audit-form .wizard-grid.three,
+.drawing-audit-form .wizard-grid.four{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.drawing-audit-form .wizard-grid.two{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.drawing-audit-form .selection-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.drawing-audit-form .selection-card{min-width:0}
+.drawing-audit-form label{display:grid;gap:7px;color:var(--navy);font-size:12px;font-weight:700;align-content:start}
+.drawing-audit-form input,
+.drawing-audit-form select{min-height:44px}
+.drawing-audit-form .basis-note{align-self:start}
+.drawing-audit-form>button[type="submit"]{width:100%;min-height:46px;font-size:14px}
+@media(max-width:1000px){
+  .drawing-audit-form .wizard-section{grid-template-columns:40px minmax(0,1fr)}
+  .drawing-audit-form .wizard-section>div:nth-child(3){grid-column:1/-1}
+}
+@media(max-width:700px){
+  .drawing-audit-form .wizard-grid.three,
+  .drawing-audit-form .wizard-grid.four,
+  .drawing-audit-form .wizard-grid.two,
+  .drawing-audit-form .selection-grid{grid-template-columns:1fr}
+}
+
 /* Quick calculator: keep the circuit inputs in two readable rows. */
 .wizard-grid.two{grid-template-columns:repeat(2,1fr)}
 .supply-route{display:grid;gap:14px}

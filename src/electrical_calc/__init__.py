@@ -1,6 +1,6 @@
 """电气工程计算自动化平台。"""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 from .breaker_selector import generate_breaker_candidates
 from .cable_selector import generate_cable_candidates
 from .circuit_strategy import (

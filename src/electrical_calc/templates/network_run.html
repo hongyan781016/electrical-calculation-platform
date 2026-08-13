@@ -7,8 +7,8 @@
   <div><p class="eyebrow">COMPLETE CIRCUIT VERSION #{{ run.id }}</p><h1>{{ run.input_snapshot.circuit_name }}</h1><p>{{ run.input_snapshot.circuit_code }} · {{ run.created_at }} · 引擎 {{ run.engine_version }}</p></div>
   <div class="actions">
     <a class="button secondary" href="/projects/{{ run.project_id }}/complete-circuit">打开当前回路</a>
-    <a class="button secondary" href="/network-runs/{{ run.id }}/report.pdf">导出 PDF</a>
-    <a class="button secondary" href="/network-runs/{{ run.id }}/export.xlsx">导出 Excel</a>
+    <a class="button secondary" href="/{% if run.drawing_circuit_id is defined %}drawing-circuit-runs{% else %}network-runs{% endif %}/{{ run.id }}/report.pdf">导出 PDF</a>
+    <a class="button secondary" href="/{% if run.drawing_circuit_id is defined %}drawing-circuit-runs{% else %}network-runs{% endif %}/{{ run.id }}/export.xlsx">导出 Excel</a>
   </div>
 </section>
 
@@ -38,7 +38,7 @@
       {% if choice.missing_items %}<div class="alert warning"><strong>保存时仍未闭合</strong><ul>{% for item in choice.missing_items %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
     {% else %}<div class="empty"><strong>没有形成主方案</strong><p>详见警告快照。</p></div>{% endif %}
 
-    {% if run.audit_json %}<div class="section-title"><div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原设计核验快照</h2></div><span class="tag">{{ run.audit_json.provisional_status }}</span></div><p class="basis-note">原设计核验与替代主方案分别保存，互不覆盖。</p>{% endif %}
+    {% if run.audit_json %}<div class="section-title"><div><p class="eyebrow">ORIGINAL DESIGN AUDIT</p><h2>原设计核验快照</h2></div><span class="tag">{{ run.audit_json.provisional_status }}</span></div><p class="basis-note">原设计核验与替代主方案分别保存，互不覆盖。</p>{% set audit = run.audit_json.outputs %}{% if audit.component_matrix %}<div class="selection-grid">{% for component in audit.component_matrix %}<article class="selection-card"><h3>{{ component.component_name }} · {{ component.designation }}</h3><p>结论：<strong>{{ component.status }}</strong></p><ul class="muted">{% for key, check in component.checks.items() %}<li>{{ check.check_name }}：{{ check.status }}</li>{% endfor %}</ul>{% if component.remediation_actions %}<strong>处理要求</strong><ul class="muted">{% for action in component.remediation_actions %}<li>{{ action }}</li>{% endfor %}</ul>{% endif %}</article>{% endfor %}</div>{% endif %}{% if audit.cross_component_checks %}<h3>跨部件配合</h3><ul>{% for check in audit.cross_component_checks %}<li>{{ check.check_name }}：{{ check.status }}</li>{% endfor %}</ul>{% endif %}{% endif %}
   </section>
   <aside class="side-stack">
     <section class="panel"><p class="eyebrow">INPUT SNAPSHOT</p><h2>输入快照</h2><dl class="kv">{% for key, value in run.input_snapshot.items() %}<div><dt>{{ key }}</dt><dd>{{ value or '—' }}</dd></div>{% endfor %}</dl></section>

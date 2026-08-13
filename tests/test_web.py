@@ -26,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.6.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.7.0"}
 
     response = client.post(
         "/projects",
@@ -151,7 +151,7 @@ def test_complete_circuit_page_builds_design_and_audit_from_engineering_inputs(t
     page = client.get("/complete-circuit")
     assert page.status_code == 200
     assert "完整低压回路" in page.text
-    assert "单电源 · 三相 · 放射式" in page.text
+    assert "单电源 · 放射式完整链路" in page.text
     assert 'name="task_mode"' in page.text
     assert 'name="transformer_capacity_kva"' in page.text
     assert 'name="upstream_short_circuit_capacity_mva"' in page.text
@@ -160,6 +160,9 @@ def test_complete_circuit_page_builds_design_and_audit_from_engineering_inputs(t
     assert 'name="length_feeder"' in page.text
     assert 'name="length_final"' in page.text
     assert 'name="existing_section_connection"' in page.text
+    assert 'name="connection_line_type"' in page.text
+    assert 'name="busway_rating_a"' in page.text
+    assert 'name="assembly_designation_main"' in page.text
     assert "用户不填写专业等值参数" in page.text
 
     response = client.post("/complete-circuit", data={})
@@ -176,7 +179,21 @@ def test_complete_circuit_page_builds_design_and_audit_from_engineering_inputs(t
     assert "原设计复核" in audit.text
     assert "QF0 250A" in audit.text
     assert "原电缆结论" in audit.text
+    assert "逐部件判定矩阵" in audit.text
+    assert "低压成套设备" in audit.text
+    assert "跨部件配合" in audit.text
     assert "独立替代主方案" in audit.text
+
+    busway_audit = client.post(
+        "/complete-circuit",
+        data={"task_mode": "audit", "connection_line_type": "busway"},
+    )
+    assert busway_audit.status_code == 200
+    assert "Canalis KTA 3L+N+PE" in busway_audit.text
+    assert "母线槽" in busway_audit.text
+    assert "1552" in busway_audit.text
+    assert "Icw(1s) 65" in busway_audit.text
+    assert "DEBU021EN" in busway_audit.text
 
 
 def test_complete_circuit_can_be_saved_as_immutable_project_version(tmp_path, monkeypatch):
@@ -238,7 +255,127 @@ def test_complete_circuit_can_be_saved_as_immutable_project_version(tmp_path, mo
         data_only=False,
     )
     assert "原设计核验" in audit_workbook.sheetnames
-    assert audit_workbook["原设计核验"]["A2"].value == "电缆"
+    assert audit_workbook["原设计核验"]["A2"].value == "变压器"
+    check_names = [
+        cell.value for cell in audit_workbook["原设计核验"]["C"][1:]
+    ]
+    assert "变压器容量边界" in check_names
+
+
+def test_project_can_archive_multiple_drawing_circuits_without_overwriting(tmp_path, monkeypatch):
+    database=Database(tmp_path/"drawing-project.db"); monkeypatch.setattr(web,"db",database)
+    client=TestClient(web.app); project_id=database.create_project("P-DWG","图纸逐回路")
+    for code, load in (("C-01","30"),("C-02","45")):
+        response=client.post(f"/projects/{project_id}/drawing-circuits",data={"circuit_code":code,"circuit_name":code,"load_value":load},follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"].startswith("/drawing-circuit-runs/")
+    page=client.get(f"/projects/{project_id}")
+    assert page.status_code == 200
+    assert "图纸逐回路核验" in page.text
+    assert "C-01" in page.text and "C-02" in page.text
+    assert "末端回路 Ib 算术合计" in page.text
+    assert len(database.list_project_drawing_circuits(project_id)) == 2
+    settings=client.post(f"/projects/{project_id}/drawing-settings",data={"simultaneity_factor":"0.8","source_note":"项目设计条件"},follow_redirects=False)
+    assert settings.status_code == 303
+    assert database.get_project_drawing_settings(project_id)["simultaneity_factor"] == 0.8
+    group_setting=client.post(f"/projects/{project_id}/drawing-group-settings",data={"level":"feeder","transformer_code":"T1","bus_section_code":"Ⅰ段","feeder_cabinet_code":"AA1","factor":"0.8","rated_current_a":"250","short_time_withstand_ka":"25","breaker_designation":"QF1","breaker_breaking_capacity_ka":"35","selectivity_upstream_designation":"QF1 Ir=200A","selectivity_downstream_designation":"QF2 In=63A","selectivity_limit_ka":"20","selectivity_reference":"厂家表第10页","source_note":"图纸参数"},follow_redirects=False)
+    assert group_setting.status_code == 303
+    assert client.get(f"/projects/{project_id}/drawing-audit.pdf").content.startswith(b"%PDF")
+    project_book=load_workbook(BytesIO(client.get(f"/projects/{project_id}/drawing-audit.xlsx").content),data_only=False)
+    assert project_book.sheetnames == ["项目汇总","回路清单","上游配电分组","问题清单","逐回路部件核验","警告"]
+    assert project_book["上游配电分组"]["A2"].value == "馈线柜"
+    assert project_book["上游配电分组"]["B2"].value == "T1"
+    assert project_book["上游配电分组"]["K2"].value == 25
+    assert project_book["项目汇总"]["A6"].value == "工程数据闭合"
+    run_id=database.list_project_drawing_circuits(project_id)[0]["latest_run_id"]
+    detail=client.get(f"/drawing-circuit-runs/{run_id}")
+    assert detail.status_code == 200
+    assert client.get(f"/drawing-circuit-runs/{run_id}/report.pdf").content.startswith(b"%PDF")
+    assert client.get(f"/drawing-circuit-runs/{run_id}/export.xlsx").content.startswith(b"PK")
+
+
+def test_drawing_audit_supports_three_phase_feeder_to_single_phase_lighting_branch(
+    tmp_path, monkeypatch
+):
+    database = Database(tmp_path / "drawing-lighting-chain.db")
+    monkeypatch.setattr(web, "db", database)
+    client = TestClient(web.app)
+    project_id = database.create_project("WH", "监管仓库")
+    data = web._drawing_circuit_form_defaults()
+    data.update({
+        "circuit_code": "WH-WL1",
+        "circuit_name": "B1-D7-1-5AT2-1-WL1",
+        "transformer_actual_model": "SCB14",
+        "connection_line_type": "internal_connection",
+        "length_connection": "0",
+        "upstream_design_current_a": "47.6",
+        "length_feeder": "100",
+        "existing_section_feeder": "25",
+        "existing_pe_section_feeder": "16",
+        "breaker_designation_feeder": "CM3-100H/3P 63A",
+        "breaker_in_feeder": "63",
+        "breaker_frame_feeder": "100",
+        "breaker_voltage_feeder": "400",
+        "breaker_icu_feeder": "100",
+        "length_final": "100",
+        "existing_section_final": "2.5",
+        "existing_pe_section_final": "2.5",
+        "breaker_designation_final": "CH2-63C/10/1",
+        "breaker_in_final": "10",
+        "breaker_frame_final": "63",
+        "breaker_voltage_final": "230",
+        "breaker_icu_final": "10",
+        "mcb_trip_curve_final": "C",
+        "incoming_breaker_designation_db": "CM3-125L/3P/63A",
+        "incoming_breaker_in_db": "63",
+        "incoming_breaker_frame_db": "100",
+        "incoming_breaker_voltage_db": "400",
+        "incoming_breaker_icu_db": "50",
+        "load_value": "0.48",
+        "power_factor": "0.8",
+        "terminal_phase": "1",
+    })
+
+    response = client.post(
+        f"/projects/{project_id}/drawing-circuits",
+        data=data,
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    run_id = database.list_project_drawing_circuits(project_id)[0]["latest_run_id"]
+    run = database.get_drawing_circuit_run(run_id)
+    assert run["derived_json"]["design_current_a"] == pytest.approx(2.727273)
+    assert run["derived_json"]["upstream_design_current_a"] == pytest.approx(47.6)
+    breakers = run["audit_json"]["outputs"]["installed_breakers"]
+    assert [item["designation"] for item in breakers] == [
+        "CM3-100H/3P 63A",
+        "CH2-63C/10/1",
+    ]
+    final = breakers[-1]
+    assert final["checks"]["automatic_disconnection"]["guaranteed_action_current_a"] == 100
+    assert final["checks"]["automatic_disconnection"]["minimum_fault_current_a"] == pytest.approx(97.652362)
+    assert final["checks"]["automatic_disconnection"]["status"] == "不通过"
+    incoming = run["audit_json"]["outputs"]["installed_incoming_breakers"]
+    assert len(incoming) == 1
+    assert incoming[0]["designation"] == "CM3-125L/3P/63A"
+    assert incoming[0]["checks"]["load_current"]["status"] == "通过"
+    coordination = run["audit_json"]["outputs"]["protection_coordination"]
+    assert [(item["upstream_designation"], item["downstream_designation"]) for item in coordination] == [
+        ("CM3-100H/3P 63A", "CM3-125L/3P/63A"),
+        ("CM3-125L/3P/63A", "CH2-63C/10/1"),
+    ]
+    pdf = client.get(f"/drawing-circuit-runs/{run_id}/report.pdf")
+    excel = client.get(f"/drawing-circuit-runs/{run_id}/export.xlsx")
+    assert pdf.content.startswith(b"%PDF")
+    assert excel.content.startswith(b"PK")
+    workbook = load_workbook(BytesIO(excel.content), read_only=True)
+    assert any(
+        "CM3-125L/3P/63A" in str(cell.value or "")
+        for sheet in workbook.worksheets
+        for row in sheet.iter_rows()
+        for cell in row
+    )
 
 
 def test_motor_page_uses_exact_reference_row_without_requiring_manual_parameters(tmp_path, monkeypatch):

@@ -51,6 +51,7 @@ CONDUCTOR_CONFIGURATIONS: dict[str, dict[str, Any]] = {
     "yjv_3c_3ph_pe": {"family": "YJV", "phases": ("3",), "label": "三芯电缆", "description": "YJV三芯电力电缆；当前已核实基础载流量", "ampacity_supported": True},
     "yjv_4c_3ph_n_pe": {"family": "YJV", "phases": ("3",), "label": "四芯电缆", "description": "YJV四芯电力电缆；空气中或地下基础载流量已核实", "ampacity_supported": True},
     "yjv_5c_3ph_n_pe": {"family": "YJV", "phases": ("3",), "label": "五芯电缆", "description": "YJV五芯电力电缆；空气中或地下基础载流量已核实", "ampacity_supported": True},
+    "yjv_4c_3ph_n_separate_pe": {"family": "YJV", "phases": ("3",), "label": "四芯电缆＋独立PE", "description": "YJV四根等截面L1/L2/L3/N，另设独立PE", "ampacity_supported": True},
 }
 
 TRAY_CONFIGURATION_OPTIONS = {
@@ -361,6 +362,32 @@ BUSWAY_PHASE_PE_IMPEDANCE: dict[str, Any] = {
     },
 }
 
+# 同一KTA 3L+N+PE特性表的完整运行、短路和故障参数。所有电阻/电抗
+# 原表单位mΩ/m，与平台Ω/km数值相同；只允许精确额定电流行，不插值。
+CANALIS_KTA_3LNPE_ELECTRICAL: dict[str, Any] = {
+    "status": "verified",
+    "source_rule_code": "ELEC.BUSWAY.CANALIS.KTA.3LNPE.ELECTRICAL",
+    "series_code": "canalis_kta_3lnpe",
+    "series_name": "Canalis KTA 3L+N+PE（外壳作PE）",
+    "document": "Schneider_Canalis_KTA_DEBU021EN.pdf",
+    "document_reference": "DEBU021EN",
+    "page": "PDF第147页（印刷第145页）",
+    "condition": "At Inc and at 35°C；50 Hz；standard version 3L+N+PE",
+    "rated_voltage_v": 1000.0,
+    "temperature_factors": {35: 1.0, 40: 0.97, 45: 0.93, 50: 0.90, 55: 0.86},
+    "rows": {
+        800: {"r1": 0.096, "x1": 0.018, "rn": 0.194, "xn": 0.064, "rpe": 0.706, "xpe": 0.426, "icw_1s": 31},
+        1000: {"r1": 0.069, "x1": 0.016, "rn": 0.140, "xn": 0.047, "rpe": 0.595, "xpe": 0.329, "icw_1s": 50},
+        1250: {"r1": 0.056, "x1": 0.015, "rn": 0.120, "xn": 0.040, "rpe": 0.490, "xpe": 0.275, "icw_1s": 50},
+        1600: {"r1": 0.042, "x1": 0.013, "rn": 0.092, "xn": 0.030, "rpe": 0.394, "xpe": 0.212, "icw_1s": 65},
+        2000: {"r1": 0.034, "x1": 0.011, "rn": 0.075, "xn": 0.024, "rpe": 0.333, "xpe": 0.170, "icw_1s": 70},
+        2500: {"r1": 0.028, "x1": 0.008, "rn": 0.066, "xn": 0.021, "rpe": 0.290, "xpe": 0.141, "icw_1s": 80},
+        3200: {"r1": 0.021, "x1": 0.007, "rn": 0.049, "xn": 0.016, "rpe": 0.229, "xpe": 0.106, "icw_1s": 86},
+        4000: {"r1": 0.017, "x1": 0.007, "rn": 0.039, "xn": 0.013, "rpe": 0.188, "xpe": 0.084, "icw_1s": 90},
+        5000: {"r1": 0.014, "x1": 0.004, "rn": 0.033, "xn": 0.011, "rpe": 0.145, "xpe": 0.071, "icw_1s": 120},
+    },
+}
+
 
 DEFAULT_CATALOG: dict[str, Any] = {
     "load_types": LOAD_TYPES,
@@ -369,6 +396,7 @@ DEFAULT_CATALOG: dict[str, Any] = {
     "yjv_four_core_sequence_impedance": YJV_FOUR_CORE_SEQUENCE_IMPEDANCE,
     "fault_loop_structure": {"YJV": YJV_FAULT_LOOP_STRUCTURE},
     "busway_phase_pe_impedance": BUSWAY_PHASE_PE_IMPEDANCE,
+    "canalis_kta_3lnpe_electrical": CANALIS_KTA_3LNPE_ELECTRICAL,
     # 未找到适用于普通负荷的完整断路器产品目录前，不枚举规格。
     # 《施耐德照明电路选择与设计技术手册》PDF第11页仅给出照明回路经验值
     # 10/16/20A，适用范围过窄，不能作为这里的通用目录。
@@ -751,7 +779,7 @@ def resolve_conductor_ampacity_basis(
                 "按表6.10的YJV三芯电缆埋地管槽工况查取；不套用YJV22直接敷设在土壤中的数据。",
             )
         if (
-            core_label in {"四芯电缆", "五芯电缆"}
+            core_label in {"四芯电缆", "五芯电缆", "四芯电缆＋独立PE"}
             and scenario in {"tray", "direct_buried"}
         ):
             code = (
@@ -846,6 +874,41 @@ def lookup_busway_phase_pe_impedance(
         "condition": series["condition"],
         "source_rule_code": catalog["source_rule_code"],
         "status": catalog["status"],
+        "unit_mapping_note": "平台单位换算（非原表文字）：1 mΩ/m = 1 Ω/km。",
+    }
+
+
+def lookup_canalis_kta_3lnpe_electrical(
+    rating_a: float,
+    ambient_temperature_c: float,
+) -> dict[str, Any] | None:
+    catalog = CANALIS_KTA_3LNPE_ELECTRICAL
+    row = catalog["rows"].get(float(rating_a))
+    factor = catalog["temperature_factors"].get(float(ambient_temperature_c))
+    if row is None or factor is None:
+        return None
+    return {
+        "series_code": catalog["series_code"],
+        "series_name": catalog["series_name"],
+        "rating_a": float(rating_a),
+        "rated_voltage_v": catalog["rated_voltage_v"],
+        "corrected_ampacity_a": float(rating_a) * factor,
+        "temperature_factor": factor,
+        "voltage_drop_r_ohm_per_km": row["r1"],
+        "voltage_drop_x_ohm_per_km": row["x1"],
+        "three_phase_r_ohm_per_km": row["r1"],
+        "three_phase_x_ohm_per_km": row["x1"],
+        "phase_neutral_r_ohm_per_km": row["rn"],
+        "phase_neutral_x_ohm_per_km": row["xn"],
+        "phase_pe_r_ohm_per_km": row["rpe"],
+        "phase_pe_x_ohm_per_km": row["xpe"],
+        "short_time_withstand_ka_1s": row["icw_1s"],
+        "source_rule_code": catalog["source_rule_code"],
+        "status": catalog["status"],
+        "document": catalog["document"],
+        "document_reference": catalog["document_reference"],
+        "page": catalog["page"],
+        "condition": catalog["condition"],
         "unit_mapping_note": "平台单位换算（非原表文字）：1 mΩ/m = 1 Ω/km。",
     }
 

@@ -58,7 +58,12 @@ from .product_protection import (
     evaluate_easypact_cvs_phase_thermal_reference,
     select_easypact_cvs_reference,
 )
-from .drawing_audit import audit_drawing_complete_circuit
+from .drawing_audit import (
+    InstalledAssembly,
+    InstalledIncomingBreaker,
+    audit_drawing_complete_circuit,
+)
+from .drawing_project_summary import summarize_drawing_circuits
 from .network_input import (
     CircuitNetworkInput,
     CircuitTaskMode,
@@ -67,15 +72,16 @@ from .network_input import (
     TerminalLoadKind,
     build_circuit_network_requests,
 )
-from .complete_circuit import InputBasis, Phase
+from .complete_circuit import InputBasis, Phase, SegmentType
 from .pole_configuration import (
     PoleAndNeutralInput,
     evaluate_pole_and_neutral_configuration,
 )
 from .radial_circuit_service import calculate_radial_complete_circuit
-from .reports import NETWORK_INPUT_LABELS, create_motor_run_pdf, create_network_run_pdf, create_run_pdf
+from .reports import NETWORK_INPUT_LABELS, create_drawing_project_pdf, create_motor_run_pdf, create_network_run_pdf, create_run_pdf
 from .spreadsheets import (
     create_input_template,
+    create_drawing_project_export,
     create_motor_run_export,
     create_network_run_export,
     create_project_export,
@@ -182,6 +188,7 @@ def _motor_form_defaults() -> dict[str, str]:
         "tray_cables_per_layer": "1",
         "enclosed_circuit_count": "",
         "transformer_family": "scb11",
+        "transformer_actual_model": "SCB11",
         "transformer_capacity_kva": "630",
         "transformer_uk_percent": "6",
         "upstream_short_circuit_capacity_mva": "100",
@@ -779,8 +786,16 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
     load_value = number("load_value", "负荷已知量")
     power_factor = number("power_factor", "功率因数")
     voltage_drop_limit = number("voltage_drop_limit_percent", "允许电压降")
+    upstream_design_current = number(
+        "upstream_design_current_a", "末端配电箱进线计算电流", optional=True
+    )
     segments: list[FeederSegmentInput] = []
     for segment_id, label in _ENGINEERING_SEGMENT_LABELS.items():
+        segment_type = (
+            SegmentType.BUSWAY if segment_id == "connection" and form["connection_line_type"] == "busway"
+            else SegmentType.INTERNAL_CONNECTION if segment_id == "connection" and form["connection_line_type"] == "internal_connection"
+            else SegmentType.CABLE
+        )
         length = number(f"length_{segment_id}", f"{label}长度")
         temperature = number(f"temperature_{segment_id}", f"{label}环境温度")
         existing_section = number(
@@ -788,13 +803,35 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
             f"{label}原电缆截面",
             optional=True,
         )
+        existing_pe_section = number(
+            f"existing_pe_section_{segment_id}",
+            f"{label}原PE截面",
+            optional=True,
+        )
         breaker = None
-        if form["task_mode"] == CircuitTaskMode.AUDIT.value:
+        if (
+            form["task_mode"] == CircuitTaskMode.AUDIT.value
+            and segment_type != SegmentType.INTERNAL_CONNECTION
+        ):
+            breaker_rated_current = number(
+                f"breaker_in_{segment_id}", f"{label}断路器In", optional=True
+            )
+            breaker_action_current = number(
+                f"breaker_action_{segment_id}",
+                f"{label}断路器保证动作电流",
+                optional=True,
+            )
+            if (
+                breaker_action_current is None
+                and breaker_rated_current is not None
+                and form[f"mcb_trip_curve_{segment_id}"] in {"B", "C"}
+            ):
+                breaker_action_current = breaker_rated_current * (
+                    5 if form[f"mcb_trip_curve_{segment_id}"] == "B" else 10
+                )
             breaker = ExistingBreakerInput(
                 designation=form[f"breaker_designation_{segment_id}"],
-                rated_current_a=number(
-                    f"breaker_in_{segment_id}", f"{label}断路器In", optional=True
-                ),
+                rated_current_a=breaker_rated_current,
                 frame_current_a=number(
                     f"breaker_frame_{segment_id}",
                     f"{label}断路器壳架电流",
@@ -810,11 +847,7 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
                     f"{label}断路器分断能力",
                     optional=True,
                 ),
-                guaranteed_action_current_a=number(
-                    f"breaker_action_{segment_id}",
-                    f"{label}断路器保证动作电流",
-                    optional=True,
-                ),
+                guaranteed_action_current_a=breaker_action_current,
             )
         if length is not None and temperature is not None:
             segments.append(
@@ -822,11 +855,25 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
                     id=segment_id,
                     label=label,
                     length_m=length,
+                    conductor_family=("BV" if segment_id == "final" and form["terminal_phase"] == "1" else "YJV"),
                     configuration_code=form[f"configuration_{segment_id}"],
                     installation_scenario=form[f"scenario_{segment_id}"],
                     temperature_c=temperature,
-                    existing_phase_section_mm2=existing_section,
+                    existing_phase_section_mm2=(
+                        None if segment_type in {SegmentType.BUSWAY, SegmentType.INTERNAL_CONNECTION} else existing_section
+                    ),
+                    existing_pe_section_mm2=existing_pe_section,
+                    mcb_trip_curve=(form[f"mcb_trip_curve_{segment_id}"] or None),
                     existing_breaker=breaker,
+                    segment_type=segment_type,
+                    busway_series_code=(
+                        form["busway_series_code"] if segment_type == SegmentType.BUSWAY else None
+                    ),
+                    busway_rating_a=(
+                        number("busway_rating_a", "母线槽额定电流", optional=True)
+                        if segment_type == SegmentType.BUSWAY else None
+                    ),
+                    phase=(Phase.SINGLE if segment_id == "final" and form["terminal_phase"] == "1" else Phase.THREE),
                 )
             )
 
@@ -846,6 +893,7 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
                 circuit_code=form["circuit_code"],
                 circuit_name=form["circuit_name"],
                 transformer_family=form["transformer_family"],
+                transformer_actual_model=form["transformer_actual_model"],
                 transformer_capacity_kva=float(transformer_capacity),
                 transformer_uk_percent=float(transformer_uk),
                 upstream_short_circuit_capacity_mva=float(upstream_capacity),
@@ -853,8 +901,57 @@ def _calculate_complete_circuit_context(submitted: dict[str, object]) -> dict[st
                 load_basis=InputBasis(form["load_basis"]),
                 load_value=float(load_value),
                 power_factor=float(power_factor),
+                terminal_phase=Phase(form["terminal_phase"]),
+                upstream_design_current_a=upstream_design_current,
                 voltage_drop_limit_percent=float(voltage_drop_limit),
                 segments=tuple(segments),
+                installed_assemblies=(
+                    tuple(
+                        InstalledAssembly(
+                            node_id,
+                            form[f"assembly_designation_{node_id}"],
+                            number(
+                                f"assembly_current_{node_id}",
+                                f"{label}额定电流",
+                                optional=True,
+                            ),
+                            number(
+                                f"assembly_voltage_{node_id}",
+                                f"{label}额定电压",
+                                optional=True,
+                            ),
+                            number(
+                                f"assembly_icw_{node_id}",
+                                f"{label}短时耐受电流",
+                                optional=True,
+                            ),
+                            form[f"assembly_reference_{node_id}"] or None,
+                        )
+                        for node_id, label in {
+                            "main": "低压馈线柜",
+                            "db": "下级配电箱",
+                        }.items()
+                    )
+                    if form["task_mode"] == CircuitTaskMode.AUDIT.value
+                    else ()
+                ),
+                installed_incoming_breakers=(
+                    (
+                        InstalledIncomingBreaker(
+                            "db",
+                            form["incoming_breaker_designation_db"],
+                            upstream_design_current,
+                            number("incoming_breaker_in_db", "照明箱进线断路器In", optional=True),
+                            number("incoming_breaker_frame_db", "照明箱进线断路器壳架", optional=True),
+                            number("incoming_breaker_voltage_db", "照明箱进线断路器Ue", optional=True),
+                            number("incoming_breaker_icu_db", "照明箱进线断路器Icu", optional=True),
+                            form["incoming_breaker_reference_db"] or None,
+                        ),
+                    )
+                    if form["task_mode"] == CircuitTaskMode.AUDIT.value
+                    and form["incoming_breaker_designation_db"]
+                    else ()
+                ),
             )
         except ValueError:
             errors.append("任务类型、负荷类型或已知量类型无效。")
@@ -901,15 +998,30 @@ def _complete_circuit_form_defaults() -> dict[str, str]:
         "task_mode": "design",
         "circuit_code": "C-001",
         "circuit_name": "完整低压放射式回路",
+        "transformer_code": "T1",
+        "bus_section_code": "Ⅰ段",
+        "feeder_cabinet_code": "AA1",
         "transformer_family": "scb11",
+        "transformer_actual_model": "SCB11",
         "transformer_capacity_kva": "1000",
         "transformer_uk_percent": "6",
         "upstream_short_circuit_capacity_mva": "100",
         "load_kind": "ordinary",
+        "terminal_phase": "3",
+        "upstream_design_current_a": "",
         "load_basis": "kw",
         "load_value": "30",
         "power_factor": "0.9",
         "voltage_drop_limit_percent": "5",
+        "connection_line_type": "cable",
+        "busway_series_code": "canalis_kta_3lnpe",
+        "busway_rating_a": "1600",
+        "incoming_breaker_designation_db": "",
+        "incoming_breaker_in_db": "",
+        "incoming_breaker_frame_db": "",
+        "incoming_breaker_voltage_db": "",
+        "incoming_breaker_icu_db": "",
+        "incoming_breaker_reference_db": "",
     }
     installed_sections = {"connection": "70", "feeder": "35", "final": "25"}
     breaker_defaults = {
@@ -917,6 +1029,19 @@ def _complete_circuit_form_defaults() -> dict[str, str]:
         "feeder": ("QF1 160A", "160", "250", "400", "35"),
         "final": ("QF2 63A", "63", "100", "400", "25"),
     }
+    assembly_defaults = {
+        "main": ("低压馈线柜", "400", "400", "35", "图纸标注/成套设备铭牌"),
+        "db": ("下级配电箱", "160", "400", "25", "图纸标注/成套设备铭牌"),
+    }
+    for node_id, values in assembly_defaults.items():
+        designation, current, voltage, icw, reference = values
+        form.update({
+            f"assembly_designation_{node_id}": designation,
+            f"assembly_current_{node_id}": current,
+            f"assembly_voltage_{node_id}": voltage,
+            f"assembly_icw_{node_id}": icw,
+            f"assembly_reference_{node_id}": reference,
+        })
     lengths = {"connection": "10", "feeder": "50", "final": "30"}
     for segment_id in _ENGINEERING_SEGMENT_LABELS:
         designation, rated, frame, voltage, icu = breaker_defaults[segment_id]
@@ -933,8 +1058,42 @@ def _complete_circuit_form_defaults() -> dict[str, str]:
                 f"breaker_voltage_{segment_id}": voltage,
                 f"breaker_icu_{segment_id}": icu,
                 f"breaker_action_{segment_id}": "",
+                f"existing_pe_section_{segment_id}": "",
+                f"mcb_trip_curve_{segment_id}": "",
             }
         )
+    return form
+
+
+def _drawing_circuit_form_defaults() -> dict[str, str]:
+    """图纸核验默认到照明箱后的单相照明分支。"""
+
+    form = _complete_circuit_form_defaults()
+    form.update({
+        "task_mode": "audit",
+        "terminal_phase": "1",
+        "load_value": "0.48",
+        "power_factor": "0.8",
+        "configuration_final": "bv_1ph_2wire_pe",
+        "configuration_feeder": "yjv_4c_3ph_n_separate_pe",
+        "scenario_final": "conduit",
+        "temperature_final": "30",
+        "existing_section_final": "2.5",
+        "existing_pe_section_feeder": "16",
+        "breaker_designation_final": "分支MCB C10",
+        "breaker_in_final": "10",
+        "breaker_frame_final": "63",
+        "breaker_voltage_final": "230",
+        "breaker_icu_final": "10",
+        "existing_pe_section_final": "2.5",
+        "mcb_trip_curve_final": "C",
+        "incoming_breaker_designation_db": "末端照明配电箱进线断路器",
+        "incoming_breaker_in_db": "63",
+        "incoming_breaker_frame_db": "100",
+        "incoming_breaker_voltage_db": "400",
+        "incoming_breaker_icu_db": "50",
+        "incoming_breaker_reference_db": "图纸标注/产品样本",
+    })
     return form
 
 
@@ -1704,6 +1863,12 @@ def project_page(request: Request, project_id: int, message: str = ""):
             NETWORK_INPUT_LABELS.get(field, field)
             for field in network["changed_fields_json"]
         ]
+    drawing_circuits = db.list_project_drawing_circuits(project_id)
+    drawing_settings = db.get_project_drawing_settings(project_id)
+    drawing_group_settings = db.list_drawing_group_settings(project_id)
+    drawing_summary = summarize_drawing_circuits(
+        drawing_circuits, drawing_settings.get("simultaneity_factor"), drawing_group_settings
+    )
     return templates.TemplateResponse(
         request=request,
         name="project.html",
@@ -1714,9 +1879,146 @@ def project_page(request: Request, project_id: int, message: str = ""):
             "network": network,
             "network_runs": db.list_network_runs(project_id),
             "motor_runs": db.list_motor_runs(project_id),
+            "drawing_circuits": drawing_circuits,
+            "drawing_settings": drawing_settings,
+            "drawing_group_settings": drawing_group_settings,
+            "drawing_summary": drawing_summary,
             "message": message,
         },
     )
+
+
+@app.post("/projects/{project_id}/drawing-settings")
+def save_project_drawing_settings(
+    project_id: int,
+    simultaneity_factor: str = Form(""),
+    source_note: str = Form(""),
+):
+    if not db.get_project(project_id): raise HTTPException(404, "项目不存在")
+    try:
+        factor = float(simultaneity_factor) if simultaneity_factor.strip() else None
+        db.save_project_drawing_settings(project_id, factor, source_note)
+    except ValueError as exc:
+        return RedirectResponse(f"/projects/{project_id}?message={quote(str(exc))}", status_code=303)
+    return RedirectResponse(f"/projects/{project_id}", status_code=303)
+
+
+@app.post("/projects/{project_id}/drawing-group-settings")
+def save_project_drawing_group_setting(
+    project_id: int, level: str = Form(...), transformer_code: str = Form(...),
+    bus_section_code: str = Form(""), feeder_cabinet_code: str = Form(""),
+    factor: str = Form(""), rated_current_a: str = Form(""), source_note: str = Form(""),
+    short_time_withstand_ka: str = Form(""), breaker_designation: str = Form(""),
+    breaker_breaking_capacity_ka: str = Form(""),
+    selectivity_upstream_designation: str = Form(""),
+    selectivity_downstream_designation: str = Form(""),
+    selectivity_limit_ka: str = Form(""), selectivity_reference: str = Form(""),
+):
+    if not db.get_project(project_id): raise HTTPException(404, "项目不存在")
+    try:
+        db.save_drawing_group_setting(
+            project_id, level, transformer_code, bus_section_code, feeder_cabinet_code,
+            float(factor) if factor.strip() else None,
+            float(rated_current_a) if rated_current_a.strip() else None, source_note,
+            float(short_time_withstand_ka) if short_time_withstand_ka.strip() else None,
+            breaker_designation,
+            float(breaker_breaking_capacity_ka) if breaker_breaking_capacity_ka.strip() else None,
+            selectivity_upstream_designation, selectivity_downstream_designation,
+            float(selectivity_limit_ka) if selectivity_limit_ka.strip() else None,
+            selectivity_reference,
+        )
+    except ValueError as exc:
+        return RedirectResponse(f"/projects/{project_id}?message={quote(str(exc))}", status_code=303)
+    return RedirectResponse(f"/projects/{project_id}", status_code=303)
+
+
+@app.get("/projects/{project_id}/drawing-audit.xlsx")
+def export_project_drawing_audit(project_id: int):
+    project = db.get_project(project_id)
+    if not project: raise HTTPException(404, "项目不存在")
+    circuits = db.list_project_drawing_circuits(project_id)
+    settings = db.get_project_drawing_settings(project_id)
+    summary = summarize_drawing_circuits(circuits, settings.get("simultaneity_factor"), db.list_drawing_group_settings(project_id))
+    content = create_drawing_project_export(project, circuits, summary, settings)
+    filename = quote(f"{project['code']}-图纸逐回路核验汇总.xlsx")
+    return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
+
+
+@app.get("/projects/{project_id}/drawing-audit.pdf")
+def export_project_drawing_audit_pdf(project_id: int):
+    project = db.get_project(project_id)
+    if not project: raise HTTPException(404, "项目不存在")
+    circuits = db.list_project_drawing_circuits(project_id)
+    settings = db.get_project_drawing_settings(project_id)
+    summary = summarize_drawing_circuits(circuits, settings.get("simultaneity_factor"), db.list_drawing_group_settings(project_id))
+    content = create_drawing_project_pdf(project, circuits, summary, settings)
+    filename = quote(f"{project['code']}-图纸逐回路核验汇总.pdf")
+    return Response(content, media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
+
+
+@app.get("/projects/{project_id}/drawing-circuits/new", response_class=HTMLResponse)
+def new_project_drawing_circuit(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project: raise HTTPException(404, "项目不存在")
+    context = _calculate_complete_circuit_context(
+        _drawing_circuit_form_defaults()
+    )
+    context.update({"project": project, "selected_project_id": project_id, "drawing_circuit_mode": True})
+    return templates.TemplateResponse(request=request, name="circuit_audit.html", context=context)
+
+
+@app.get("/projects/{project_id}/drawing-circuits/{circuit_code}", response_class=HTMLResponse)
+def edit_project_drawing_circuit(request: Request, project_id: int, circuit_code: str):
+    project = db.get_project(project_id)
+    circuit = db.get_drawing_circuit(project_id, circuit_code)
+    if not project or not circuit: raise HTTPException(404, "图纸回路不存在")
+    context = _calculate_complete_circuit_context(circuit["input_json"])
+    context.update({"project": project, "selected_project_id": project_id, "drawing_circuit_mode": True})
+    return templates.TemplateResponse(request=request, name="circuit_audit.html", context=context)
+
+
+@app.post("/projects/{project_id}/drawing-circuits")
+async def save_project_drawing_circuit(request: Request, project_id: int):
+    project = db.get_project(project_id)
+    if not project: raise HTTPException(404, "项目不存在")
+    submitted = dict(await request.form()); submitted["task_mode"] = "audit"
+    context = _calculate_complete_circuit_context(submitted)
+    if context["errors"] or not context["audit_result"]:
+        context.update({"request": request, "project": project, "selected_project_id": project_id, "drawing_circuit_mode": True})
+        return templates.TemplateResponse(request=request, name="circuit_audit.html", context=context, status_code=422)
+    circuit = db.save_project_drawing_circuit(project_id, context["form"])
+    rule_codes = _collect_rule_codes(context["alternative_result"])
+    rule_codes.update(_collect_rule_codes(context["audit_result"]))
+    rules = db.rules_by_code(); snapshot = {code: rules[code] for code in sorted(rule_codes) if code in rules}
+    run_id = db.create_drawing_circuit_run(
+        project_id, circuit, engine_version=__version__, input_snapshot=context["form"],
+        derived=context["derived"] or {}, audit_result=context["audit_result"],
+        result=context["alternative_result"], rule_snapshot=snapshot,
+    )
+    return RedirectResponse(f"/drawing-circuit-runs/{run_id}", status_code=303)
+
+
+@app.get("/drawing-circuit-runs/{run_id}", response_class=HTMLResponse)
+def drawing_circuit_run_page(request: Request, run_id: int):
+    run = db.get_drawing_circuit_run(run_id)
+    if not run: raise HTTPException(404, "图纸回路核验记录不存在")
+    return templates.TemplateResponse(request=request, name="network_run.html", context={"run": run})
+
+
+@app.get("/drawing-circuit-runs/{run_id}/report.pdf")
+def export_drawing_circuit_run_pdf(run_id: int):
+    run=db.get_drawing_circuit_run(run_id)
+    if not run: raise HTTPException(404, "图纸回路核验记录不存在")
+    return Response(create_network_run_pdf(run), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(run['project_code']+'-'+run['circuit_code']+'-核验.pdf')}"})
+
+
+@app.get("/drawing-circuit-runs/{run_id}/export.xlsx")
+def export_drawing_circuit_run_excel(run_id: int):
+    run=db.get_drawing_circuit_run(run_id)
+    if not run: raise HTTPException(404, "图纸回路核验记录不存在")
+    return Response(create_network_run_export(run), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(run['project_code']+'-'+run['circuit_code']+'-核验.xlsx')}"})
 
 
 @app.get("/projects/{project_id}/complete-circuit", response_class=HTMLResponse)

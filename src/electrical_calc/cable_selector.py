@@ -60,6 +60,7 @@ class CableSelectionRequest:
     neutral_required: bool
     protective_conductor_mode: str
     conditions: CableInstallationConditions
+    separate_protective_section_mm2: float | None = None
 
 
 def _rule_approved(rules: dict[str, dict[str, Any]], code: str) -> bool:
@@ -410,6 +411,8 @@ def _allocation(
         neutral_section = section_mm2
         if mode == "included":
             return False, None, None, "BV单芯线组合的PE应作为独立导体配置。"
+        if mode == "separate" and request.separate_protective_section_mm2 is not None:
+            protective_section = float(request.separate_protective_section_mm2)
     elif code == "bv_3ph_4wire_pe":
         neutral_section = section_mm2
         if mode == "included":
@@ -439,6 +442,12 @@ def _allocation(
         neutral_section = reduced_section
         if mode == "included":
             protective_section = reduced_section
+    elif code == "yjv_4c_3ph_n_separate_pe":
+        neutral_section = section_mm2
+        if mode == "included":
+            return False, None, None, "四芯L1/L2/L3/N结构的PE应作为独立导体配置。"
+        if mode == "separate" and request.separate_protective_section_mm2 is not None:
+            protective_section = float(request.separate_protective_section_mm2)
 
     return True, neutral_section, protective_section, None
 
@@ -477,6 +486,30 @@ def _resolved_electrical(
     three_r = voltage_r
     three_x = voltage_x
     phase_pe_r = phase_pe_x = None
+    phase_neutral_r = phase_neutral_x = None
+    if request.family == "BV" and request.configuration_code == "bv_1ph_2wire_pe":
+        # 近邻铜导体保守常规法：ρ=0.0237Ω·mm²/m、忽略电抗。
+        # 该方法只形成末端最小故障电流暂算，不冒充精确序阻抗。
+        conventional_rho = 0.0237
+        phase_neutral_r = conventional_rho * 1000 * (1 / section + 1 / section)
+        phase_neutral_x = 0.0
+        pe_section = candidate.get("protective_section_mm2")
+        if pe_section is not None:
+            phase_pe_r = conventional_rho * 1000 * (1 / section + 1 / float(pe_section))
+            phase_pe_x = 0.0
+        resolved_reference_ids.append("ELEC.EARTH_FAULT.TN.CONVENTIONAL")
+    elif (
+        request.family == "YJV"
+        and request.configuration_code == "yjv_4c_3ph_n_separate_pe"
+    ):
+        conventional_rho = 0.0237
+        phase_neutral_r = conventional_rho * 1000 * (1 / section + 1 / section)
+        phase_neutral_x = 0.0
+        pe_section = candidate.get("protective_section_mm2")
+        if pe_section is not None:
+            phase_pe_r = conventional_rho * 1000 * (1 / section + 1 / float(pe_section))
+            phase_pe_x = 0.0
+        resolved_reference_ids.append("ELEC.EARTH_FAULT.TN.CONVENTIONAL")
     if request.family == "YJV" and request.configuration_code == "yjv_4c_3ph_n_pe":
         sequence = lookup_yjv_four_core_phase_pe_impedance(section)
         if sequence:
@@ -539,8 +572,8 @@ def _resolved_electrical(
         voltage_drop_x_ohm_per_km=voltage_x,
         three_phase_r_ohm_per_km=three_r,
         three_phase_x_ohm_per_km=three_x,
-        phase_neutral_r_ohm_per_km=None,
-        phase_neutral_x_ohm_per_km=None,
+        phase_neutral_r_ohm_per_km=phase_neutral_r,
+        phase_neutral_x_ohm_per_km=phase_neutral_x,
         phase_pe_r_ohm_per_km=phase_pe_r,
         phase_pe_x_ohm_per_km=phase_pe_x,
         corrected_ampacity_a=float(candidate["corrected_ampacity_a"]),

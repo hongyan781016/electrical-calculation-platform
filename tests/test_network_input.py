@@ -2,7 +2,7 @@ from math import sqrt
 
 import pytest
 
-from src.electrical_calc.complete_circuit import CircuitApplication, InputBasis
+from src.electrical_calc.complete_circuit import CircuitApplication, InputBasis, Phase, SegmentType
 from src.electrical_calc.network_input import (
     CircuitNetworkInput,
     CircuitTaskMode,
@@ -11,6 +11,7 @@ from src.electrical_calc.network_input import (
     TerminalLoadKind,
     build_circuit_network_requests,
 )
+from src.electrical_calc.drawing_audit import InstalledAssembly
 
 
 def segments(*, audit: bool = False, scenario: str = "tray"):
@@ -77,7 +78,11 @@ def test_ordinary_load_builds_three_segment_radial_request_without_manual_rx():
 
 def test_audit_mode_builds_installed_cables_and_breakers_for_all_segments():
     result = build_circuit_network_requests(
-        network(task_mode=CircuitTaskMode.AUDIT, segments=segments(audit=True)),
+        network(
+            task_mode=CircuitTaskMode.AUDIT,
+            segments=segments(audit=True),
+            installed_assemblies=(InstalledAssembly("main", "AA1", 400, 400, 35),),
+        ),
         {},
     )
 
@@ -85,6 +90,7 @@ def test_audit_mode_builds_installed_cables_and_breakers_for_all_segments():
     assert result.audit_request is not None
     assert len(result.audit_request.installed_cables) == 3
     assert len(result.audit_request.installed_breakers) == 3
+    assert len(result.audit_request.installed_assemblies) == 1
 
 
 def test_invalid_inputs_return_all_errors_without_partial_topology():
@@ -103,7 +109,68 @@ def test_invalid_inputs_return_all_errors_without_partial_topology():
     assert len(result.errors) >= 5
     assert any("回路编号" in item for item in result.errors)
     assert any("三段连续线路" in item for item in result.errors)
-    assert any("YJV" in item for item in result.errors)
+    assert any("BV目录" in item for item in result.errors)
+
+
+def test_lighting_board_chain_uses_three_phase_feeder_and_single_phase_branch():
+    items = list(segments())
+    items[-1] = FeederSegmentInput(
+        id="final",
+        label="照明箱至WL1",
+        length_m=30,
+        conductor_family="BV",
+        configuration_code="bv_1ph_2wire_pe",
+        installation_scenario="conduit",
+        temperature_c=30,
+        phase=Phase.SINGLE,
+        existing_pe_section_mm2=2.5,
+        mcb_trip_curve="C",
+    )
+    result = build_circuit_network_requests(
+        network(
+            load_value=0.48,
+            power_factor=0.8,
+            terminal_phase=Phase.SINGLE,
+            upstream_design_current_a=47.6,
+            segments=tuple(items),
+        ),
+        {},
+    )
+
+    assert result.errors == ()
+    assert result.derived["design_current_a"] == pytest.approx(0.48 * 1000 / (220 * 0.8))
+    flows = {item.segment_id: item for item in result.radial_request.segment_load_flows}
+    assert flows["connection"].design_current_a == pytest.approx(47.6)
+    assert flows["feeder"].design_current_a == pytest.approx(47.6)
+    assert flows["final"].design_current_a == pytest.approx(2.7272727)
+    assert flows["final"].phase == Phase.SINGLE
+    requests = {item.segment_id: item for item in result.radial_request.cable_requests}
+    assert requests["final"].family == "BV"
+    assert requests["final"].phase == Phase.SINGLE
+    assert requests["final"].separate_protective_section_mm2 == 2.5
+    points = {item.protected_segment_id: item for item in result.radial_request.protection_points}
+    assert points["final"].allowed_families == ("MCB",)
+    assert points["final"].pole_requirement == "1P"
+    assert points["final"].mcb_trip_curve == "C"
+    assert result.radial_request.maximum_candidates_per_cable_segment == 4
+
+
+def test_internal_connection_boundary_does_not_create_fake_breaker_point():
+    items = list(segments())
+    items[0] = FeederSegmentInput(
+        id="connection",
+        label="柜内母排边界",
+        length_m=0,
+        segment_type=SegmentType.INTERNAL_CONNECTION,
+        existing_breaker=None,
+    )
+    result = build_circuit_network_requests(network(segments=tuple(items)), {})
+
+    assert result.errors == ()
+    assert [item.protected_segment_id for item in result.radial_request.protection_points] == [
+        "feeder",
+        "final",
+    ]
 
 
 def test_exact_motor_catalog_row_derives_motor_parameters_and_application():
@@ -142,3 +209,25 @@ def test_direct_buried_request_uses_existing_catalog_spacing_key():
     conditions = result.radial_request.cable_requests[0].conditions
     assert conditions.buried_duct_spacing_m == "0.25"
     assert conditions.buried_depth_m == 0.7
+
+
+def test_kta_busway_replaces_first_cable_with_fixed_electrical_segment():
+    items = list(segments(audit=True))
+    items[0] = FeederSegmentInput(
+        id="connection", label="变压器至低压柜", length_m=5,
+        temperature_c=40, existing_breaker=items[0].existing_breaker,
+        segment_type=SegmentType.BUSWAY,
+        busway_series_code="canalis_kta_3lnpe", busway_rating_a=1600,
+    )
+    result = build_circuit_network_requests(
+        network(task_mode=CircuitTaskMode.AUDIT, segments=tuple(items)), {}
+    )
+    assert result.errors == ()
+    assert result.radial_request.circuit.segments[0].segment_type == SegmentType.BUSWAY
+    assert len(result.radial_request.cable_requests) == 2
+    fixed = result.radial_request.fixed_segment_electrical[0]
+    assert fixed.segment_id == "connection"
+    assert fixed.corrected_ampacity_a == 1552
+    assert fixed.three_phase_r_ohm_per_km == 0.042
+    assert len(result.audit_request.installed_cables) == 2
+    assert result.audit_request.installed_busways[0].short_time_withstand_ka_1s == 65

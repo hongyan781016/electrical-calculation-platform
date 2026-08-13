@@ -137,6 +137,64 @@ class Database:
                     ON network_calculation_runs(project_id,id DESC);
                 CREATE INDEX IF NOT EXISTS idx_network_runs_network
                     ON network_calculation_runs(network_id,network_revision);
+                CREATE TABLE IF NOT EXISTS project_drawing_circuits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    circuit_code TEXT NOT NULL,
+                    circuit_name TEXT NOT NULL,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    input_hash TEXT NOT NULL,
+                    input_json TEXT NOT NULL,
+                    changed_fields_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(project_id,circuit_code)
+                );
+                CREATE TABLE IF NOT EXISTS drawing_circuit_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    drawing_circuit_id INTEGER NOT NULL REFERENCES project_drawing_circuits(id) ON DELETE CASCADE,
+                    circuit_revision INTEGER NOT NULL,
+                    engine_version TEXT NOT NULL,
+                    input_snapshot TEXT NOT NULL,
+                    derived_json TEXT NOT NULL,
+                    audit_json TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    rule_snapshot TEXT NOT NULL,
+                    warnings_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    provisional_status TEXT NOT NULL,
+                    stale INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_drawing_circuit_runs_project
+                    ON drawing_circuit_runs(project_id,id DESC);
+                CREATE TABLE IF NOT EXISTS project_drawing_settings (
+                    project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                    simultaneity_factor REAL,
+                    source_note TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS project_drawing_group_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    level TEXT NOT NULL CHECK(level IN ('feeder','bus','transformer')),
+                    transformer_code TEXT NOT NULL,
+                    bus_section_code TEXT NOT NULL DEFAULT '',
+                    feeder_cabinet_code TEXT NOT NULL DEFAULT '',
+                    factor REAL,
+                    rated_current_a REAL,
+                    short_time_withstand_ka REAL,
+                    breaker_designation TEXT NOT NULL DEFAULT '',
+                    breaker_breaking_capacity_ka REAL,
+                    selectivity_upstream_designation TEXT NOT NULL DEFAULT '',
+                    selectivity_downstream_designation TEXT NOT NULL DEFAULT '',
+                    selectivity_limit_ka REAL,
+                    selectivity_reference TEXT NOT NULL DEFAULT '',
+                    source_note TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(project_id,level,transformer_code,bus_section_code,feeder_cabinet_code)
+                );
                 CREATE TABLE IF NOT EXISTS project_motors (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -168,6 +226,21 @@ class Database:
                     ON motor_calculation_runs(project_id,id DESC);
                 """
             )
+            # 本地开发数据库可能已经创建过较早版本的分组设置表。
+            existing_group_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(project_drawing_group_settings)")
+            }
+            for column, declaration in {
+                "short_time_withstand_ka": "REAL",
+                "breaker_designation": "TEXT NOT NULL DEFAULT ''",
+                "breaker_breaking_capacity_ka": "REAL",
+                "selectivity_upstream_designation": "TEXT NOT NULL DEFAULT ''",
+                "selectivity_downstream_designation": "TEXT NOT NULL DEFAULT ''",
+                "selectivity_limit_ka": "REAL",
+                "selectivity_reference": "TEXT NOT NULL DEFAULT ''",
+            }.items():
+                if column not in existing_group_columns:
+                    conn.execute(f"ALTER TABLE project_drawing_group_settings ADD COLUMN {column} {declaration}")
             count = conn.execute("SELECT COUNT(*) FROM reference_rules").fetchone()[0]
             if count == 0:
                 now = utc_now()
@@ -215,6 +288,7 @@ class Database:
                     ("ELEC.TRANSFORMER.POSITIVE_SEQUENCE.IMPEDANCE", "10/0.4kV变压器正负序阻抗", "verified", "工业与民用供配电设计手册（第四版）.pdf", "第四版", "表4.6-12、表4.6-13", "表4.6-12　S11-M型油浸式叠铁芯变压器阻抗平均值（归算至400V侧）\n表4.6-13　SCB11型环氧树脂浇注干式变压器阻抗平均值（归算至400V侧）", "PDF第337页（印刷第305页）", "已逐项视觉核验负载损耗、正负序电阻及正负序电抗；当前只按S11-M、SCB11精确系列/容量/uk%组合查表，不插值，未批准。", now),
                     ("ELEC.CABLE.YJV.FOUR_CORE.PHASE_PE.IMPEDANCE", "YJV四芯3+1电缆相保阻抗", "verified", "工业与民用供配电设计手册（第四版）.pdf", "第四版", "表4.2-46、式(4.6-44)～式(4.6-46)、第4.6.4节(1)第4项", "表4.2-46　YJV-0.6/1kV 4芯（非等截面）电缆（铜芯）电气参数\n电流回路通过N导体零序阻抗\n在计算单相短路电流时，假设的计算温度升高，电阻值增大，其值一般为20℃时电阻的1.5倍。", "PDF第245、335、340页（印刷第213、303、308页）", "只接入表列圆形导体3+1规格；第四芯明确作为PE金属返回导体时，采用Z′(0)N且不计大地并联返回，并按相保阻抗关系计算；表注说明数据为理论计算数据且仅供参考，未批准。", now),
                     ("ELEC.BUSWAY.CANALIS.PHASE_PE.IMPEDANCE", "Canalis母线槽相—PE故障回路阻抗", "verified", "Schneider_Canalis_Low_Voltage_DEBU034EN.pdf；Schneider_Canalis_KTA_DEBU021EN.pdf", "DEBU034EN；DEBU021EN", "Fault loop characteristics", "Fault loop characteristics\nImpedance method\nAt Inc and at 35°C　Average resistance　Ph/PE\nAt Inc at 35°C and at 50 Hz　Average reactance　Ph/PE", "DEBU034EN PDF第66页（印刷第64页）；DEBU021EN PDF第146～149页（印刷第144～147页）", "已逐页视觉核验。仅按Canalis KS/KTA精确系列、PE结构和额定电流采用表列Ph/PE R/X；单位mΩ/m按等值数值换算为Ω/km，不插值；未批准。", now),
+                    ("ELEC.BUSWAY.CANALIS.KTA.3LNPE.ELECTRICAL", "Canalis KTA 3L+N+PE完整电气参数", "verified", "Schneider_Canalis_KTA_DEBU021EN.pdf", "DEBU021EN", "Characteristics of run sections", "Nominal rated current at an ambient temperature of 35°C Inc\nRated operating voltage Ue\nAllowable rated short-time withstand current (t = 1 s) Icw\nConductor characteristics\nFault loop characteristics", "PDF第147页（印刷第145页）", "已逐页视觉核验。仅用于KTA standard version 3L+N+PE精确额定电流行；运行R/X、Ph/N、Ph/PE、Ue及Icw均取自同一表，不插值；未批准。", now),
                     ("ELEC.EARTH_FAULT.TN.IMPEDANCE", "TN系统故障回路阻抗与保护电器", "verified", "规范大全-2025.12.7b.chm", "GB/T 16895.21-2020", "411.4.4、411.4.5", "411.4.4　保护电器（见411.4.5）的特性以及回路的阻抗应满足公式（1）：\nZₛ×Iₐ≤U₀　…………（1）\n式中：\nZₛ——故障回路的阻抗，单位为欧姆（Ω），它包括下列部分的阻抗：\n• 电源；\n• 至故障点的线导体；和\n• 故障点和电源之间的保护导体。\nIₐ——在411.3.2.2表41.1、411.3.2.3规定的时间内能使切断电器自动动作的电流，单位为安培（A）。采用剩余电流保护器（RCD）时，是在411.3.2.2规定的时间内切断电源的剩余动作电流。\nU₀——交流或直流线对地的标称电压，单位为伏特（V）。\n411.4.5　下列保护电器可用作TN系统的故障防护（间接接触防护）：\n——过电流保护器；\n——剩余电流保护器（RCD）。", "CHM /规范/GB16895.21-2020/02.htm", "已逐条核实；Ia仍须按具体保护器件时间—电流或RCD动作特性取得；未批准。", now),
                     ("ELEC.EARTH_FAULT.TN.DISCONNECTION_TIME", "TN系统最长切断电源时间", "verified", "规范大全-2025.12.7b.chm", "GB/T 16895.21-2020", "411.3.2.2、411.3.2.3、表41.1", "411.3.2.2　对于不超过如下额定电流的终端回路，其最长的切断电源的时间应符合表41.1的规定：\n——装1个或多个插座的回路为63A；和\n——只供电给固定连接用电设备的回路为32A。\n411.3.2.3　在TN系统内配电回路和411.3.2.2规定之外的回路，其切断电源的时间不可超过5s。\n表41.1　最长的切断电源时间\n| 系统 | 120 V＜U₀≤230 V（s） | 120 V＜U₀≤230 V（s） |\n| --- | --- | --- |\n| 电压 | a.c. | d.c. |\n| TN | 0.4 | 1 |\nU₀：交流或直流线对地的标称电压。", "CHM /规范/GB16895.21-2020/02.htm", "已核实；表41.1本项只录入TN系统交流120V＜U₀≤230V单元格；未批准。", now),
                     ("ELEC.EARTH_FAULT.TN.CONVENTIONAL", "TN系统接地故障常规法", "verified", "Schneider_Electrical_Installation_Guide_2018.pdf", "Electrical Installation Guide 2018", "F 5.3 Conventional method", "Lmax＝0.8U₀Sph/[ρ(1＋m)Ia]\nm＝Sph/SPE", "PDF第185页（F15）", "已逐页视觉核验。当前仅接入铜芯、相导体与PE导体在同一电缆内或彼此靠近、截面不超过120mm²的常规法；采用ρ＝23.7×10^-3Ω·mm²/m及0.8电压系数，规则未批准。", now),
@@ -631,6 +705,191 @@ class Database:
             data["input_json"] = json.loads(data["input_json"])
             data["changed_fields_json"] = json.loads(data["changed_fields_json"])
             return data
+
+    def save_project_drawing_circuit(
+        self, project_id: int, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """按项目＋回路编号保存图纸回路；只使同编号旧版本过期。"""
+        circuit_code = str(input_data.get("circuit_code", "")).strip()
+        circuit_name = str(input_data.get("circuit_name", "")).strip()
+        if not circuit_code or not circuit_name:
+            raise ValueError("图纸回路编号和名称不能为空")
+        serialized = self._canonical_json(input_data)
+        digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        now = utc_now()
+        with self.connect() as conn:
+            if not conn.execute("SELECT id FROM projects WHERE id=?", (project_id,)).fetchone():
+                raise ValueError("项目不存在")
+            existing = conn.execute(
+                "SELECT * FROM project_drawing_circuits WHERE project_id=? AND circuit_code=?",
+                (project_id, circuit_code),
+            ).fetchone()
+            if existing and existing["input_hash"] == digest:
+                return {"id": int(existing["id"]), "revision": int(existing["revision"]), "changed": False, "changed_fields": []}
+            if existing:
+                previous = json.loads(existing["input_json"])
+                changed_fields = sorted(
+                    key for key in set(previous) | set(input_data)
+                    if previous.get(key) != input_data.get(key)
+                )
+                revision = int(existing["revision"]) + 1
+                conn.execute(
+                    "UPDATE project_drawing_circuits SET circuit_name=?,revision=?,input_hash=?,input_json=?,changed_fields_json=?,updated_at=? WHERE id=?",
+                    (circuit_name, revision, digest, serialized, json.dumps(changed_fields, ensure_ascii=False), now, existing["id"]),
+                )
+                conn.execute(
+                    "UPDATE drawing_circuit_runs SET stale=1 WHERE drawing_circuit_id=?",
+                    (existing["id"],),
+                )
+                circuit_id = int(existing["id"])
+            else:
+                changed_fields = sorted(input_data)
+                cursor = conn.execute(
+                    "INSERT INTO project_drawing_circuits (project_id,circuit_code,circuit_name,revision,input_hash,input_json,changed_fields_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (project_id, circuit_code, circuit_name, 1, digest, serialized, json.dumps(changed_fields, ensure_ascii=False), now, now),
+                )
+                circuit_id = int(cursor.lastrowid); revision = 1
+            conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (now, project_id))
+            return {"id": circuit_id, "revision": revision, "changed": True, "changed_fields": changed_fields}
+
+    def create_drawing_circuit_run(
+        self, project_id: int, circuit: dict[str, Any], *, engine_version: str,
+        input_snapshot: dict[str, Any], derived: dict[str, Any],
+        audit_result: dict[str, Any] | None, result: dict[str, Any],
+        rule_snapshot: dict[str, dict[str, Any]],
+    ) -> int:
+        warnings = list(result.get("warnings", []))
+        if audit_result:
+            warnings.extend(audit_result.get("warnings", []))
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "INSERT INTO drawing_circuit_runs (project_id,drawing_circuit_id,circuit_revision,engine_version,input_snapshot,derived_json,audit_json,result_json,rule_snapshot,warnings_json,status,provisional_status,stale,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?)",
+                (project_id, circuit["id"], circuit["revision"], engine_version,
+                 self._canonical_json(input_snapshot), self._canonical_json(derived),
+                 self._canonical_json(audit_result or {}), self._canonical_json(result),
+                 self._canonical_json(rule_snapshot), json.dumps(warnings, ensure_ascii=False),
+                 (audit_result or result).get("status", "无法判断"),
+                 (audit_result or result).get("provisional_status", "无法判断"), utc_now()),
+            )
+            return int(cursor.lastrowid)
+
+    def list_project_drawing_circuits(self, project_id: int) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT c.*,r.id AS latest_run_id,r.status,r.provisional_status,r.derived_json,r.audit_json,r.result_json,r.created_at AS calculated_at
+                FROM project_drawing_circuits c
+                LEFT JOIN drawing_circuit_runs r ON r.id=(SELECT rr.id FROM drawing_circuit_runs rr WHERE rr.drawing_circuit_id=c.id AND rr.stale=0 ORDER BY rr.id DESC LIMIT 1)
+                WHERE c.project_id=? ORDER BY c.circuit_code""", (project_id,),
+            ).fetchall()
+            result=[]
+            for row in rows:
+                item=dict(row); item["input_json"]=json.loads(item["input_json"])
+                item["changed_fields_json"]=json.loads(item["changed_fields_json"])
+                item["derived_json"]=json.loads(item["derived_json"]) if item.get("derived_json") else {}
+                item["audit_json"]=json.loads(item["audit_json"]) if item.get("audit_json") else {}
+                item["result_json"]=json.loads(item["result_json"]) if item.get("result_json") else {}
+                result.append(item)
+            return result
+
+    def get_drawing_circuit(self, project_id: int, circuit_code: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row=conn.execute("SELECT * FROM project_drawing_circuits WHERE project_id=? AND circuit_code=?",(project_id,circuit_code)).fetchone()
+            if not row: return None
+            item=dict(row); item["input_json"]=json.loads(item["input_json"]); item["changed_fields_json"]=json.loads(item["changed_fields_json"]); return item
+
+    def get_drawing_circuit_run(self, run_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """SELECT r.*,p.code AS project_code,p.name AS project_name,
+                c.circuit_code,c.circuit_name
+                FROM drawing_circuit_runs r
+                JOIN projects p ON p.id=r.project_id
+                JOIN project_drawing_circuits c ON c.id=r.drawing_circuit_id
+                WHERE r.id=?""", (run_id,),
+            ).fetchone()
+            if not row: return None
+            item=dict(row)
+            for key in ("input_snapshot","derived_json","audit_json","result_json","rule_snapshot","warnings_json"):
+                item[key]=json.loads(item[key])
+            item["network_revision"] = item["circuit_revision"]
+            item["task_mode"] = item["input_snapshot"].get("task_mode", "audit")
+            return item
+
+    def save_project_drawing_settings(
+        self, project_id: int, simultaneity_factor: float | None, source_note: str
+    ) -> None:
+        if simultaneity_factor is not None and not 0 < simultaneity_factor <= 1:
+            raise ValueError("同时系数必须大于0且不大于1")
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO project_drawing_settings(project_id,simultaneity_factor,source_note,updated_at)
+                VALUES(?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET
+                simultaneity_factor=excluded.simultaneity_factor,source_note=excluded.source_note,updated_at=excluded.updated_at""",
+                (project_id, simultaneity_factor, source_note.strip(), utc_now()),
+            )
+
+    def get_project_drawing_settings(self, project_id: int) -> dict[str, Any]:
+        with self.connect() as conn:
+            row=conn.execute("SELECT * FROM project_drawing_settings WHERE project_id=?",(project_id,)).fetchone()
+            return dict(row) if row else {"project_id":project_id,"simultaneity_factor":None,"source_note":""}
+
+    def save_drawing_group_setting(
+        self, project_id: int, level: str, transformer_code: str,
+        bus_section_code: str = "", feeder_cabinet_code: str = "",
+        factor: float | None = None, rated_current_a: float | None = None,
+        source_note: str = "", short_time_withstand_ka: float | None = None,
+        breaker_designation: str = "", breaker_breaking_capacity_ka: float | None = None,
+        selectivity_upstream_designation: str = "",
+        selectivity_downstream_designation: str = "",
+        selectivity_limit_ka: float | None = None, selectivity_reference: str = "",
+    ) -> None:
+        if level not in {"feeder", "bus", "transformer"}:
+            raise ValueError("汇总层级无效")
+        if not transformer_code.strip():
+            raise ValueError("变压器编号不能为空")
+        if level in {"feeder", "bus"} and not bus_section_code.strip():
+            raise ValueError("母线段编号不能为空")
+        if level == "feeder" and not feeder_cabinet_code.strip():
+            raise ValueError("馈线柜编号不能为空")
+        if factor is not None and not 0 < factor <= 1:
+            raise ValueError("层级系数必须大于0且不大于1")
+        if rated_current_a is not None and rated_current_a <= 0:
+            raise ValueError("设备额定电流必须大于0")
+        for value, label in ((short_time_withstand_ka, "Icw"), (breaker_breaking_capacity_ka, "Icu"), (selectivity_limit_ka, "选择性极限")):
+            if value is not None and value <= 0:
+                raise ValueError(f"{label}必须大于0")
+        bus = bus_section_code.strip() if level in {"feeder", "bus"} else ""
+        feeder = feeder_cabinet_code.strip() if level == "feeder" else ""
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO project_drawing_group_settings
+                (project_id,level,transformer_code,bus_section_code,feeder_cabinet_code,factor,rated_current_a,
+                short_time_withstand_ka,breaker_designation,breaker_breaking_capacity_ka,
+                selectivity_upstream_designation,selectivity_downstream_designation,selectivity_limit_ka,
+                selectivity_reference,source_note,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(project_id,level,transformer_code,bus_section_code,feeder_cabinet_code)
+                DO UPDATE SET factor=excluded.factor,rated_current_a=excluded.rated_current_a,
+                short_time_withstand_ka=excluded.short_time_withstand_ka,
+                breaker_designation=excluded.breaker_designation,
+                breaker_breaking_capacity_ka=excluded.breaker_breaking_capacity_ka,
+                selectivity_upstream_designation=excluded.selectivity_upstream_designation,
+                selectivity_downstream_designation=excluded.selectivity_downstream_designation,
+                selectivity_limit_ka=excluded.selectivity_limit_ka,
+                selectivity_reference=excluded.selectivity_reference,
+                source_note=excluded.source_note,updated_at=excluded.updated_at""",
+                (project_id, level, transformer_code.strip(), bus, feeder, factor,
+                 rated_current_a, short_time_withstand_ka, breaker_designation.strip(),
+                 breaker_breaking_capacity_ka, selectivity_upstream_designation.strip(),
+                 selectivity_downstream_designation.strip(), selectivity_limit_ka,
+                 selectivity_reference.strip(), source_note.strip(), utc_now()),
+            )
+
+    def list_drawing_group_settings(self, project_id: int) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT * FROM project_drawing_group_settings WHERE project_id=? ORDER BY level,transformer_code,bus_section_code,feeder_cabinet_code",
+                (project_id,),
+            ).fetchall()]
 
     def create_network_run(
         self,

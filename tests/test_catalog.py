@@ -2,11 +2,23 @@ import pytest
 
 from src.electrical_calc.catalog import (
     lookup_busway_phase_pe_impedance,
+    lookup_canalis_kta_3lnpe_electrical,
     lookup_transformer_phase_pe_impedance,
     lookup_transformer_positive_sequence_impedance,
     lookup_yjv_four_core_phase_pe_impedance,
     lookup_yjv_fault_loop_structure,
 )
+
+
+def test_kta_3lnpe_complete_electrical_row_is_exact_and_temperature_corrected():
+    row = lookup_canalis_kta_3lnpe_electrical(1600, 40)
+    assert row["corrected_ampacity_a"] == 1552
+    assert row["three_phase_r_ohm_per_km"] == 0.042
+    assert row["phase_neutral_x_ohm_per_km"] == 0.030
+    assert row["phase_pe_r_ohm_per_km"] == 0.394
+    assert row["short_time_withstand_ka_1s"] == 65
+    assert lookup_canalis_kta_3lnpe_electrical(1500, 40) is None
+    assert lookup_canalis_kta_3lnpe_electrical(1600, 42) is None
 
 
 def test_scb11_positive_sequence_lookup_keeps_positive_and_phase_pe_x_separate():

@@ -1,5 +1,6 @@
 from src.electrical_calc.database import Database
 from src.electrical_calc.engine import calculate_all
+import pytest
 
 
 def sample_circuit(code="AL-01"):
@@ -98,6 +99,52 @@ def test_complete_network_is_unique_per_project(tmp_path):
     assert first["id"] == second["id"]
     assert second["revision"] == 2
     assert len(database.list_network_runs(project_id)) == 0
+
+
+def test_drawing_circuits_are_versioned_independently_per_project(tmp_path):
+    database=Database(tmp_path/"drawing-circuits.db"); project_id=database.create_project("P-DWG","图纸项目")
+    c1=database.save_project_drawing_circuit(project_id,{"circuit_code":"C-01","circuit_name":"回路一","load_value":"30"})
+    run1=database.create_drawing_circuit_run(project_id,c1,engine_version="0.7.0-dev",input_snapshot={"circuit_code":"C-01"},derived={"design_current_a":50},audit_result={"status":"无法判断","provisional_status":"通过","warnings":[]},result={"status":"无法判断","provisional_status":"通过","warnings":[]},rule_snapshot={})
+    c2=database.save_project_drawing_circuit(project_id,{"circuit_code":"C-02","circuit_name":"回路二","load_value":"20"})
+    database.create_drawing_circuit_run(project_id,c2,engine_version="0.7.0-dev",input_snapshot={"circuit_code":"C-02"},derived={"design_current_a":30},audit_result={"status":"无法判断","provisional_status":"通过","warnings":[]},result={"status":"无法判断","provisional_status":"通过","warnings":[]},rule_snapshot={})
+    assert len(database.list_project_drawing_circuits(project_id)) == 2
+    changed=database.save_project_drawing_circuit(project_id,{"circuit_code":"C-01","circuit_name":"回路一","load_value":"45"})
+    assert changed["revision"] == 2
+    assert database.get_drawing_circuit_run(run1)["stale"] == 1
+    current=database.list_project_drawing_circuits(project_id)
+    assert next(item for item in current if item["circuit_code"]=="C-02")["latest_run_id"] is not None
+
+
+def test_project_drawing_settings_validate_and_persist_factor(tmp_path):
+    database = Database(tmp_path / "drawing-settings.db")
+    project_id = database.create_project("P-SET", "图纸汇总设置")
+    database.save_project_drawing_settings(project_id, 0.75, "设计条件确认")
+    settings = database.get_project_drawing_settings(project_id)
+    assert settings["simultaneity_factor"] == 0.75
+    assert settings["source_note"] == "设计条件确认"
+    with pytest.raises(ValueError, match="同时系数"):
+        database.save_project_drawing_settings(project_id, 1.2, "")
+
+
+def test_drawing_group_settings_are_unique_per_level_and_path(tmp_path):
+    database=Database(tmp_path/"group-settings.db"); project_id=database.create_project("P-GRP","分组设置")
+    database.save_drawing_group_setting(project_id,"feeder","T1","I","AA1",0.8,250,"图纸")
+    database.save_drawing_group_setting(project_id,"feeder","T1","I","AA1",0.75,200,"复核")
+    rows=database.list_drawing_group_settings(project_id)
+    assert len(rows)==1 and rows[0]["factor"]==0.75 and rows[0]["rated_current_a"]==200
+    with pytest.raises(ValueError,match="层级系数"):
+        database.save_drawing_group_setting(project_id,"bus","T1","I",factor=0)
+
+
+def test_drawing_group_protection_parameters_persist(tmp_path):
+    database=Database(tmp_path/"group-protection.db"); project_id=database.create_project("P-PROT","上游保护")
+    database.save_drawing_group_setting(project_id,"bus","T1","I",factor=1,rated_current_a=1600,
+        short_time_withstand_ka=50,breaker_designation="QF0",breaker_breaking_capacity_ka=65,
+        selectivity_upstream_designation="QF0 Ir=1250A",selectivity_downstream_designation="QF1 Ir=200A",
+        selectivity_limit_ka=25,selectivity_reference="厂家选择性表第8页",source_note="铭牌")
+    row=database.list_drawing_group_settings(project_id)[0]
+    assert row["short_time_withstand_ka"]==50 and row["breaker_breaking_capacity_ka"]==65
+    assert row["selectivity_reference"]=="厂家选择性表第8页"
 
 
 def test_motor_versions_are_immutable_per_project_and_circuit(tmp_path):

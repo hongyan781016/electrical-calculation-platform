@@ -10,7 +10,12 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from .reports import NETWORK_SEGMENT_LABELS, network_derived_rows, network_input_rows
+from .reports import (
+    AUDIT_CHECK_LABELS,
+    NETWORK_SEGMENT_LABELS,
+    network_derived_rows,
+    network_input_rows,
+)
 
 
 HEADERS = [
@@ -367,19 +372,22 @@ def create_network_run_export(run: dict[str, Any]) -> bytes:
     audit_outputs = run.get("audit_json", {}).get("outputs", {})
     if audit_outputs:
         audit = wb.create_sheet("原设计核验")
-        audit.append(["对象", "线路段", "原规格/标识", "结论"])
-        for cable in audit_outputs.get("installed_cables", []):
+        audit.append(["对象", "原规格/标识", "核验项", "判定", "判定条件", "缺失/说明"])
+        for component in audit_outputs.get("component_matrix", []):
+            for code, check in component.get("checks", {}).items():
+                audit.append([
+                    component.get("component_name", component.get("component_type")),
+                    component.get("designation"), AUDIT_CHECK_LABELS.get(code, code),
+                    check.get("status", "无法判断"), check.get("criterion", ""),
+                    check.get("reason", "") or "；".join(component.get("remediation_actions", [])),
+                ])
+        for check in audit_outputs.get("cross_component_checks", []):
             audit.append([
-                "电缆", NETWORK_SEGMENT_LABELS.get(cable.get("segment_id"), cable.get("segment_id")),
-                cable.get("designation"),
-                cable.get("status", cable.get("reason", "无法判断")),
+                "跨部件配合", check.get("check_name"), "系统配合",
+                check.get("status", "无法判断"), check.get("criterion", ""), check.get("reason", ""),
             ])
-        for breaker in audit_outputs.get("installed_breakers", []):
-            audit.append([
-                "断路器", "", breaker.get("designation"), breaker.get("status", "无法判断"),
-            ])
-        _format_table(audit, 4)
-        _fit_columns(audit, [16, 20, 48, 20])
+        _format_table(audit, 6)
+        _fit_columns(audit, [18, 46, 24, 16, 58, 58])
 
     nodes = wb.create_sheet("逐节点校核")
     nodes.append(["节点", "累计压降(%)", "最大三相短路(kA)", "最小相-PE故障(A)"])
@@ -443,6 +451,81 @@ def create_motor_run_export(run: dict[str, Any]) -> bytes:
     for code,rule in run["rule_snapshot"].items(): rules.append([code,rule.get("status"),rule.get("document_name"),rule.get("clause_no"),rule.get("page_no")])
     _format_table(rules,5); _fit_columns(rules,[38,16,45,30,28])
     stream=BytesIO(); wb.save(stream); return stream.getvalue()
+
+
+def create_drawing_project_export(
+    project: dict[str, Any], circuits: list[dict[str, Any]], summary: dict[str, Any],
+    settings: dict[str, Any],
+) -> bytes:
+    """导出项目内所有图纸回路的当前有效核验结果。"""
+    wb = Workbook()
+    overview = wb.active; overview.title = "项目汇总"
+    overview.append(["项目编号", project.get("code"), "项目名称", project.get("name")])
+    overview.append(["有效回路数", summary.get("circuit_count"), "Ib算术合计(A)", summary.get("arithmetic_total_current_a")])
+    overview.append(["同时系数", summary.get("simultaneity_factor"), "上游计算电流(A)", summary.get("upstream_design_current_a")])
+    overview.append(["变压器额定电流(A)", summary.get("transformer_rated_current_a"), "容量复核", summary.get("transformer_capacity_status")])
+    overview.append(["系数来源/说明", settings.get("source_note", ""), "电源树一致", "是" if summary.get("source_consistent") else "否"])
+    completeness = summary.get("completeness", {})
+    overview.append(["工程数据闭合", completeness.get("engineering_data_gate"), "正式成果发布", completeness.get("formal_release_gate")])
+    overview.append(["不通过项", completeness.get("counts", {}).get("不通过", 0), "无法判断项", completeness.get("counts", {}).get("无法判断", 0)])
+    _fit_columns(overview, [24, 42, 24, 42])
+
+    sheet = wb.create_sheet("回路清单")
+    sheet.append(["回路编号", "回路名称", "修订", "计算电流(A)", "正式状态", "暂算状态", "计算时间"])
+    for item in circuits:
+        sheet.append([item.get("circuit_code"), item.get("circuit_name"), item.get("revision"),
+                      item.get("derived_json", {}).get("design_current_a"), item.get("status") or "未计算",
+                      item.get("provisional_status") or "未计算", item.get("calculated_at") or ""])
+    _format_table(sheet, 7); _fit_columns(sheet, [22, 38, 12, 20, 18, 18, 24])
+
+    groups = wb.create_sheet("上游配电分组")
+    groups.append(["层级", "变压器编号", "母线段编号", "馈线柜编号", "直接下级合计(A)", "系数", "本级设计电流(A)", "设备额定电流(A)", "负荷复核", "Ikmax(kA)", "Icw(1s)(kA)", "Icw复核", "断路器", "Icu(kA)", "Icu复核", "选择性极限(kA)", "选择性复核", "来源说明"])
+    for level, key in (("馈线柜", "feeder_cabinet_groups"), ("母线段", "bus_section_groups"), ("变压器", "transformer_groups")):
+        for group in summary.get(key, []):
+            codes = list(group["codes"]) + [""] * (3-len(group["codes"]))
+            direct = group.get("arithmetic_total_current_a") if level == "馈线柜" else group.get("direct_child_current_a")
+            groups.append([level, *codes, direct, group.get("factor"), group.get("design_current_a"),
+                           group.get("rated_current_a"), group.get("equipment_status"),
+                           group.get("prospective_short_circuit_ka"), group.get("short_time_withstand_ka"),
+                           group.get("short_time_withstand_status"), group.get("breaker_designation"),
+                           group.get("breaker_breaking_capacity_ka"), group.get("breaking_capacity_status"),
+                           group.get("selectivity_limit_ka"), group.get("selectivity_status"),
+                           "；".join(filter(None, (group.get("source_note", ""), group.get("selectivity_reference", ""))))])
+    _format_table(groups, 18); _fit_columns(groups, [14, 18, 18, 18, 20, 12, 20, 20, 16, 18, 18, 16, 28, 16, 16, 20, 16, 55])
+
+    issues = wb.create_sheet("问题清单")
+    issues.append(["优先级", "范围", "对象", "校核项", "状态", "处理要求", "说明/条件"])
+    for issue in completeness.get("issues", []):
+        issues.append([issue.get("priority"), issue.get("scope"), issue.get("subject"),
+                       issue.get("check"), issue.get("status"), issue.get("action"), issue.get("detail")])
+    _format_table(issues, 7); _fit_columns(issues, [14, 16, 50, 28, 16, 75, 55])
+    for row in issues.iter_rows(min_row=2):
+        for cell in row: cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    checks = wb.create_sheet("逐回路部件核验")
+    checks.append(["回路", "部件", "规格/标识", "核验项", "判定", "判定条件", "原因/整改"])
+    for item in circuits:
+        outputs = item.get("audit_json", {}).get("outputs", {})
+        for component in outputs.get("component_matrix", []):
+            actions = "；".join(component.get("remediation_actions", []))
+            for code, check in component.get("checks", {}).items():
+                checks.append([item.get("circuit_code"), component.get("component_name", component.get("component_type")),
+                               component.get("designation"), AUDIT_CHECK_LABELS.get(code, code), check.get("status"),
+                               check.get("criterion", ""), check.get("reason", "") or actions])
+        for check in outputs.get("cross_component_checks", []):
+            checks.append([item.get("circuit_code"), "跨部件配合", check.get("check_name"), "系统配合",
+                           check.get("status"), check.get("criterion", ""), check.get("reason", "")])
+    _format_table(checks, 7); _fit_columns(checks, [18, 25, 42, 22, 16, 55, 65])
+    for row in checks.iter_rows(min_row=2):
+        for cell in row: cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    warnings = wb.create_sheet("警告")
+    warnings.append(["范围", "内容"])
+    for warning in summary.get("warnings", []): warnings.append(["项目汇总", warning])
+    for item in circuits:
+        for warning in item.get("audit_json", {}).get("warnings", []): warnings.append([item.get("circuit_code"), warning])
+    _format_table(warnings, 2); _fit_columns(warnings, [20, 100])
+    stream = BytesIO(); wb.save(stream); return stream.getvalue()
 
 
 def _format_table(ws, last_col: int) -> None:

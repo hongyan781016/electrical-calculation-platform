@@ -2,6 +2,7 @@ from dataclasses import replace
 
 from src.electrical_calc.drawing_audit import (
     DrawingCircuitAuditRequest,
+    InstalledAssembly,
     InstalledBreaker,
     InstalledCable,
     audit_drawing_complete_circuit,
@@ -65,6 +66,10 @@ def audit_request(first_breaker_icu_ka=35):
         radial_request=replace(radial, maximum_candidates_per_cable_segment=3),
         installed_cables=installed_cables,
         installed_breakers=installed_breakers,
+        installed_assemblies=(
+            InstalledAssembly("main", "AA1馈线柜", 400, 400, 35, "图纸"),
+            InstalledAssembly("db", "AP1配电箱", 160, 400, 25, "图纸"),
+        ),
     )
 
 
@@ -89,6 +94,12 @@ def test_drawing_audit_keeps_original_components_and_does_not_substitute():
         "maximum_permitted_let_through_energy_a2s"
     ] > 0
     assert len(result.outputs["protection_coordination"]) == 2
+    assert result.outputs["transformer"]["checks"]["rated_capacity"]["status"] == UNKNOWN
+    assert len(result.outputs["installed_assemblies"]) == 2
+    assert len(result.outputs["component_matrix"]) == 10
+    assert len(result.outputs["cross_component_checks"]) == 3
+    assert result.outputs["cross_component_checks"][0]["check_code"] == "voltage_drop"
+    assert result.outputs["installed_assemblies"][0]["checks"]["rated_current"]["status"] == "通过"
     assert all(
         item["status"] == UNKNOWN
         for item in result.outputs["protection_coordination"]
@@ -97,6 +108,22 @@ def test_drawing_audit_keeps_original_components_and_does_not_substitute():
     # 尚未取得，已知条件已经足以判定原设计不通过。
     assert result.provisional_status == FAIL
     assert "replacement" not in str(result.outputs["installed_breakers"]).lower()
+
+
+def test_drawing_audit_marks_assembly_failed_when_short_time_withstand_is_low():
+    base = audit_request()
+    result = audit_drawing_complete_circuit(
+        replace(
+            base,
+            installed_assemblies=(
+                InstalledAssembly("main", "AA1馈线柜", 400, 400, 1, "图纸"),
+            ),
+        ),
+        approved_rules(),
+    )
+    assembly = result.outputs["installed_assemblies"][0]
+    assert assembly["checks"]["short_time_withstand"]["status"] == FAIL
+    assert result.provisional_status == FAIL
 
 
 def test_drawing_audit_marks_original_breaker_failed_when_icu_is_too_low():
