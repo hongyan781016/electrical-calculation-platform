@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}确认分支回路 · 电气计算台{% endblock %}
+{% block content %}
+<section class="hero circuit-head">
+  <div>
+    <p class="eyebrow">SELECTED CIRCUIT ROW</p>
+    <h1>{{ row.panel_code }} · {{ row.circuit_code }}</h1>
+    <p>这里只确认所选配电箱的一条分支，不会混入其他图框或其他配电箱的候选。确认后进入完整回路页面继续补齐上游条件。</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">ROW EVIDENCE</p><h2>图纸同行识别结果</h2></div><span class="status-pill pending">待确认</span></div>
+  <div class="summary-grid">
+    <div><span>配电箱</span><strong>{{ row.panel_code }}</strong></div>
+    <div><span>支路</span><strong>{{ row.circuit_code }}</strong></div>
+    <div><span>负荷</span><strong>{{ (row.load_kw ~ ' kW') if row.load_kw else '未唯一识别' }}</strong></div>
+    <div><span>用途</span><strong>{{ row.destination or '未唯一识别' }}</strong></div>
+  </div>
+  <p><strong>断路器：</strong>{{ row.breaker_spec or '未唯一识别' }}</p>
+  <p><strong>电缆：</strong>{{ row.cable_spec or '未唯一识别' }}</p>
+  {% if selected_panel and selected_panel.design_current_a %}<p><strong>配电箱表头：</strong>Pe={{ selected_panel.installed_power_kw or '未唯一识别' }} kW，Ijs={{ selected_panel.design_current_a }} A{% if selected_feeder %}；与上游馈线Ijs <span class="status-pill {{ 'pass' if panel_flow_matches else 'fail' }}">{{ '一致' if panel_flow_matches else '不一致，必须复核' }}</span>{% endif %}</p>{% endif %}
+  {% if selected_panel and selected_panel.incoming_breaker_spec %}<p><strong>配电箱进线断路器：</strong>{{ selected_panel.incoming_breaker_spec }}</p>{% endif %}
+  <p class="muted">本行证据：{{ row.evidence_ids|join('、') }}</p>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">UPSTREAM FEEDER</p><h2>按目的配电箱编号关联的上游馈线</h2></div><span class="status-pill {{ 'pending' if selected_feeder else 'warning' }}">{{ '唯一候选待确认' if selected_feeder else '未唯一闭合' }}</span></div>
+  {% if selected_feeder %}
+  <div class="summary-grid">
+    <div><span>馈线柜/回路</span><strong>{{ selected_feeder.cabinet_code }} / {{ selected_feeder.feeder_code }}</strong></div>
+    <div><span>目的箱</span><strong>{{ selected_feeder.destination_panel_code }}</strong></div>
+    <div><span>负荷流</span><strong>{{ selected_feeder.load_kw }} kW / {{ selected_feeder.design_current_a }} A</strong></div>
+    <div><span>图纸区域</span><strong>{{ selected_feeder.drawing_region_id }}</strong></div>
+  </div>
+  <p><strong>断路器：</strong>{{ selected_feeder.breaker_spec }}{% if selected_feeder.breaker_current_a %} · {{ selected_feeder.breaker_current_a }} A{% endif %}</p>
+  <p><strong>电缆：</strong>{{ selected_feeder.cable_spec }}</p>
+  <p class="muted">关联依据是系统图目的箱编号与所选配电箱编号完全一致；该连接仍由本页人工确认。</p>
+  {% elif feeder_matches %}
+  <div class="alert warning"><strong>上游馈线存在冲突</strong><span>找到{{ feeder_matches|length }}个相关候选，但没有唯一无冲突项，本次不自动带入。</span></div>
+  {% else %}
+  <div class="alert warning"><strong>没有找到上游馈线</strong><span>本次只带入末端支路，馈线柜及配电箱进线条件需人工补齐。</span></div>
+  {% endif %}
+</section>
+
+{% if selected_feeder %}<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">POWER SOURCE</p><h2>同一低压系统图的变压器候选</h2></div><span class="status-pill {{ 'pending' if selected_transformer else 'warning' }}">{{ '唯一候选待确认' if selected_transformer else '未唯一闭合' }}</span></div>
+  {% if selected_transformer %}
+  <div class="summary-grid">
+    <div><span>编号</span><strong>{{ selected_transformer.transformer_code }}</strong></div>
+    <div><span>实际型号</span><strong>{{ selected_transformer.actual_model }}</strong></div>
+    <div><span>容量</span><strong>{{ selected_transformer.capacity_kva }} kVA</strong></div>
+    <div><span>uk</span><strong>{{ selected_transformer.uk_percent }}%</strong></div>
+  </div>
+  <p>{{ selected_transformer.voltage_text }}</p>
+  <p><strong>低压进线柜：</strong>{{ selected_transformer.incoming_cabinet_code or '未唯一识别' }}；<strong>进线断路器：</strong>{{ selected_transformer.main_breaker_spec or '未唯一识别' }}{% if selected_transformer.main_breaker_current_a %}，In={{ selected_transformer.main_breaker_current_a }}A{% endif %}</p>
+  <p><strong>图纸低压主母排：</strong>{{ selected_transformer.busbar_spec or '未唯一识别' }}</p>
+  <p class="muted">该项仅因与上游馈线位于同一张低压系统图且当前只有一个无冲突变压器候选而列出，仍需用户确认其母线连接关系。实际型号不在阻抗目录时，不自动冒充参考系列。</p>
+  {% elif transformer_matches %}<div class="alert warning"><strong>变压器候选存在冲突</strong><span>本次不自动带入。</span></div>
+  {% else %}<div class="alert warning"><strong>没有形成变压器候选</strong><span>需从系统图或铭牌补齐。</span></div>{% endif %}
+</section>{% endif %}
+
+<form method="post" action="/drawing-import/confirm" class="stack">
+  <input type="hidden" name="drawing_import_id" value="{{ import_record_id }}">
+  <input type="hidden" name="source_filename" value="{{ source.filename }}">
+  <input type="hidden" name="source_format" value="{{ source.format }}">
+  <input type="hidden" name="source_sha256" value="{{ source.sha256 }}">
+  <input type="hidden" name="source_parser" value="{{ source.parser_name }}">
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">CONFIRM</p><h2>逐项核对后带入计算</h2></div></div>
+    {% if fields %}<div class="selection-grid">
+      {% for field in fields %}
+      <article class="selection-card">
+        <label class="drawing-confirm-check"><input type="checkbox" name="accept__{{ loop.index0 }}" checked>采用此值</label>
+        <input type="hidden" name="field__{{ loop.index0 }}" value="{{ field.field_name }}">
+        <input type="hidden" name="original__{{ loop.index0 }}" value="{{ field.value }}">
+        <input type="hidden" name="evidence__{{ loop.index0 }}" value="{{ field.evidence_ids|join('|') }}">
+        <label>{{ field.label }}<input name="value__{{ loop.index0 }}" value="{{ field.value }}"></label>
+        <p class="muted">{{ field.basis }} · 证据：{{ field.evidence_ids|join('、') or '无原图证据' }}</p>
+      </article>
+      {% endfor %}
+    </div>{% endif %}
+    <div class="alert warning"><strong>仍需核对完整链路</strong><span>本页只带入具有明确文字或唯一同图候选的字段；母线连接、出口连接段、线路长度及未列出的设备参数必须在下一页依据同一工程图纸确认，不能采用不相关的默认值作为图纸事实。</span></div>
+    <button type="submit">确认本行并进入完整回路核验</button>
+  </section>
+</form>
+{% endblock %}

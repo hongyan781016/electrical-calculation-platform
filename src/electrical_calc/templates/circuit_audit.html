@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}完整回路 · 电气计算台{% endblock %}
 {% block content %}
+{% if drawing_import_source %}
+<div class="notice"><strong>图纸辅助导入：</strong>{{ drawing_import_source.filename }}。已确认字段已带入；默认值及缺项仍需在计算前核对。{% if form.drawing_import_confirmation_id %} <a href="/drawing-confirmations/{{ form.drawing_import_confirmation_id }}">查看证据修订</a>{% endif %}</div>
+{% endif %}
 <section class="quick-head circuit-head">
   <div>
     <p class="eyebrow">COMPLETE RADIAL CIRCUIT · V0.3</p>
@@ -13,6 +16,7 @@
 {% if errors %}<div class="alert danger"><strong>不能计算</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
 
 <form method="post" action="/complete-circuit" class="circuit-wizard drawing-audit-form">
+  {% if form.drawing_import_confirmation_id %}<input type="hidden" name="drawing_import_confirmation_id" value="{{ form.drawing_import_confirmation_id }}">{% endif %}
   <section class="panel wizard-section">
     <div class="wizard-index">01</div><div><p class="eyebrow">TASK</p><h2>选择任务</h2></div>
     <div class="wizard-grid three">
@@ -29,8 +33,8 @@
     <div class="wizard-index">02</div><div><p class="eyebrow">POWER SOURCE</p><h2>电源条件</h2></div>
     <div class="wizard-grid four">
       <label>图纸实际型号<input name="transformer_actual_model" value="{{ form.transformer_actual_model }}" placeholder="例如 SCB14"></label>
-      <label>阻抗计算参考系列<select name="transformer_family"><option value="scb11" {% if form.transformer_family == 'scb11' %}selected{% endif %}>SCB11已核验阻抗表</option><option value="s11_m" {% if form.transformer_family == 's11_m' %}selected{% endif %}>S11-M已核验阻抗表</option></select><small>实际型号不在目录时仅作参考计算，不能视为型号匹配</small></label>
-      <label>容量（kVA）<select name="transformer_capacity_kva">{% for value in transformer_capacities %}<option value="{{ value|int }}" {% if form.transformer_capacity_kva|float == value %}selected{% endif %}>{{ value|int }}</option>{% endfor %}</select></label>
+      <label>阻抗计算参考系列<select name="transformer_family" required><option value="" {% if not form.transformer_family %}selected{% endif %}>请选择经核对的参考系列</option><option value="scb11" {% if form.transformer_family == 'scb11' %}selected{% endif %}>SCB11已核验阻抗表</option><option value="s11_m" {% if form.transformer_family == 's11_m' %}selected{% endif %}>S11-M已核验阻抗表</option></select><small>实际型号不在目录时仅作参考计算，不能视为型号匹配</small></label>
+      <label>容量（kVA）<select name="transformer_capacity_kva" required><option value="" {% if not form.transformer_capacity_kva %}selected{% endif %}>请选择</option>{% for value in transformer_capacities %}<option value="{{ value|int }}" {% if form.transformer_capacity_kva and form.transformer_capacity_kva|float == value %}selected{% endif %}>{{ value|int }}</option>{% endfor %}</select></label>
       <label>铭牌 uk（%）<input name="transformer_uk_percent" type="number" min="0.1" step="0.1" required value="{{ form.transformer_uk_percent }}"></label>
       <label>上级系统短路容量（MVA）<input name="upstream_short_circuit_capacity_mva" type="number" min="0.1" step="0.1" required value="{{ form.upstream_short_circuit_capacity_mva }}"><small>不知道时采用100MVA参考工况</small></label>
     </div>

@@ -38,6 +38,7 @@
 .drawing-audit-form select{min-height:44px}
 .drawing-audit-form .basis-note{align-self:start}
 .drawing-audit-form>button[type="submit"]{width:100%;min-height:46px;font-size:14px}
+.drawing-confirm-check{display:flex!important;grid-template-columns:auto 1fr;align-items:center;justify-content:start;gap:8px!important}.drawing-confirm-check input{width:auto;min-height:auto}
 @media(max-width:1000px){
   .drawing-audit-form .wizard-section{grid-template-columns:40px minmax(0,1fr)}
   .drawing-audit-form .wizard-section>div:nth-child(3){grid-column:1/-1}

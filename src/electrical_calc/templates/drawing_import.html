@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}图纸辅助导入 · 电气计算台{% endblock %}
+{% block content %}
+<section class="hero circuit-head">
+  <div>
+    <p class="eyebrow">DRAWING ASSISTED IMPORT · V0.8</p>
+    <h1>图纸辅助识别</h1>
+    <p>只读提取图纸证据，生成待确认候选。系统不会把识别置信度当作工程批准，也不会修改原图。</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">BACKENDS</p><h2>本机解析能力</h2></div></div>
+  <div class="selection-grid">
+    {% for format, item in capabilities.items() %}
+    <article class="selection-card">
+      <h3>{{ format|upper }}</h3>
+      <p><span class="status-pill {{ 'pass' if item.available else 'pending' }}">{{ '已就绪' if item.available else '待接入' }}</span></p>
+      <p>{{ item.backend }}</p>
+      {% if item.note %}<p class="muted">{{ item.note }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">SOURCE</p><h2>选择图纸</h2></div><span class="status-pill pending">本地只读</span></div>
+  <form method="post" action="/drawing-import/extract" enctype="multipart/form-data" class="stack">
+    <label>归属项目（可不选）
+      <select name="project_id"><option value="">暂不归档到项目</option>{% for project in projects %}<option value="{{ project.id }}">{{ project.code }} · {{ project.name }}</option>{% endfor %}</select>
+    </label>
+    <label>DWG、DXF或PDF（首版不超过25MB）<input type="file" name="drawing" accept=".dwg,.dxf,.pdf" required></label>
+    <button type="submit">提取图纸证据</button>
+  </form>
+  {% if error %}<div class="alert warning"><strong>未生成候选</strong><span>{{ error }}</span></div>{% endif %}
+</section>
+
+{% if candidate %}
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">EVIDENCE</p><h2>提取结果</h2></div><span class="status-pill pending">待人工确认</span></div>
+  <div class="summary-grid">
+    <div><span>文件</span><strong>{{ candidate.source.filename }}</strong></div>
+    <div><span>格式</span><strong>{{ candidate.source.format }}</strong></div>
+    <div><span>证据实体</span><strong>{{ candidate.evidence|length }}</strong></div>
+    <div><span>候选字段</span><strong>{{ candidate.facts|length }}</strong></div>
+  </div>
+  <p class="muted">SHA-256：{{ candidate.source.sha256 }}</p>
+  {% if candidate.warnings %}<div class="alert warning"><ul>{% for item in candidate.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if candidate.conflicts %}<div class="alert warning"><strong>冲突项不能自动确认</strong><ul>{% for item in candidate.conflicts %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if candidate.missing_fields %}<div class="basis-note"><strong>计算前仍需补齐：</strong>{{ candidate.missing_fields|join('、') }}</div>{% endif %}
+</section>
+
+{% if candidate.regions %}
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">DRAWING REGIONS</p><h2>按标题栏识别的图纸区域</h2></div><span class="status-pill pass">{{ candidate.regions|length }}张</span></div>
+  <label>候选字段筛选
+    <select id="drawing-region-filter"><option value="">显示全部图纸</option>{% for region in candidate.regions %}<option value="{{ region.region_id }}">{{ region.drawing_number }} · {{ region.title }}</option>{% endfor %}</select>
+  </label>
+  <div class="selection-grid">{% for region in candidate.regions %}<article class="selection-card"><h3>{{ region.drawing_number }}</h3><p>{{ region.title }}</p><p class="muted">{{ region.region_type }} · {{ region.evidence_ids|length }}条坐标证据 · 锚点{{ region.anchor_evidence_id }}</p></article>{% endfor %}</div>
+</section>
+{% endif %}
+
+{% if candidate.panels %}
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">PANEL &amp; CIRCUIT ROWS</p><h2>配电箱与分支回路行</h2></div><span class="status-pill pending">{{ candidate.panels|length }}个箱 · {{ candidate.circuit_rows|length }}条支路待确认</span></div>
+  <div class="basis-note">以下关系依据同一图框内的坐标分组形成，只是识别候选。选定具体回路后，仍需人工确认再进入完整回路核验。</div>
+  <label>按配电箱筛选
+    <select id="drawing-panel-filter"><option value="">显示全部配电箱</option>{% for panel in candidate.panels %}<option value="{{ panel.panel_id }}">{{ panel.panel_code }} · {{ panel.drawing_region_id }}</option>{% endfor %}</select>
+  </label>
+  <div class="selection-grid drawing-panel-list">
+    {% for panel in candidate.panels %}
+    <article class="selection-card drawing-panel-card" data-panel="{{ panel.panel_id }}"><h3>{{ panel.panel_code }}</h3><p>{{ panel.drawing_region_id }}</p><p class="muted">{{ panel.evidence_ids|length }}条分组证据 · 锚点{{ panel.anchor_evidence_id }}</p></article>
+    {% endfor %}
+  </div>
+  {% if candidate.circuit_rows %}
+  <div class="selection-grid drawing-row-list">
+    {% for row in candidate.circuit_rows %}
+    <article class="selection-card drawing-row-card" data-panel="{{ row.panel_id }}">
+      <h3>{{ row.panel_code }} · {{ row.circuit_code }}</h3>
+      <p><strong>断路器：</strong>{{ row.breaker_spec or '未唯一识别' }}</p>
+      <p><strong>负荷：</strong>{{ (row.load_kw ~ ' kW') if row.load_kw else '未唯一识别' }}</p>
+      <p><strong>用途：</strong>{{ row.destination or '未唯一识别' }}</p>
+      <p><strong>电缆：</strong>{{ row.cable_spec or '未唯一识别' }}</p>
+      <p class="muted">置信度 {{ (row.confidence * 100)|round|int }}% · 证据{{ row.evidence_ids|length }}条{% if row.conflicts %} · {{ row.conflicts|join('；') }}{% endif %}</p>
+      {% if import_record_id and row.state.value != 'conflict' %}<form method="post" action="/drawing-import/select-row"><input type="hidden" name="drawing_import_id" value="{{ import_record_id }}"><input type="hidden" name="row_id" value="{{ row.row_id }}"><button type="submit" class="secondary">选择此回路并核对</button></form>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if not candidate.circuit_rows %}
+<form method="post" action="/drawing-import/confirm" class="stack">
+  {% if import_record_id %}<input type="hidden" name="drawing_import_id" value="{{ import_record_id }}">{% endif %}
+  <input type="hidden" name="source_filename" value="{{ candidate.source.filename }}">
+  <input type="hidden" name="source_format" value="{{ candidate.source.format }}">
+  <input type="hidden" name="source_sha256" value="{{ candidate.source.sha256 }}">
+  <input type="hidden" name="source_parser" value="{{ candidate.source.parser_name }}">
+  <section class="panel">
+    <div class="section-title"><div><p class="eyebrow">CONFIRM</p><h2>确认候选字段</h2></div></div>
+    {% if candidate.facts %}
+    <div class="selection-grid">
+      {% for fact in candidate.facts %}
+      <article class="selection-card drawing-fact-card" data-region="{{ fact.region_id }}">
+        <label class="drawing-confirm-check"><input type="checkbox" name="accept__{{ loop.index0 }}" {% if fact.state.value != 'conflict' %}checked{% endif %}>采用此值</label>
+        <input type="hidden" name="field__{{ loop.index0 }}" value="{{ fact.field_name }}">
+        <input type="hidden" name="original__{{ loop.index0 }}" value="{{ fact.value }}">
+        <input type="hidden" name="evidence__{{ loop.index0 }}" value="{{ fact.evidence_ids|join('|') }}">
+        <label>{{ fact.label }}<input name="value__{{ loop.index0 }}" value="{{ fact.value }}"></label>
+        <p>置信度 {{ (fact.confidence * 100)|round|int }}% · {{ '冲突' if fact.state.value == 'conflict' else '待确认' }}</p>
+        <p class="muted">证据：{{ fact.evidence_ids|join('、') }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    <button type="submit">确认并带入完整回路核验</button>
+    {% else %}
+    <div class="alert warning"><strong>没有形成结构化字段</strong><span>证据已提取，但当前规则未识别出计算字段。</span></div>
+    {% endif %}
+  </section>
+</form>
+{% endif %}
+
+{% if candidate.topology %}
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">TOPOLOGY</p><h2>连接候选</h2></div></div>
+  <div class="selection-grid">{% for edge in candidate.topology %}<article class="selection-card"><h3>{{ edge.from_code }} → {{ edge.to_code }}</h3><p>置信度 {{ (edge.confidence * 100)|round|int }}%</p><p class="muted">证据：{{ edge.evidence_ids|join('、') }}</p></article>{% endfor %}</div>
+</section>
+{% endif %}
+
+<details class="panel advanced-fields">
+  <summary>查看原始证据定位</summary>
+  {% if candidate.evidence|length > 300 %}<p class="muted">共{{ candidate.evidence|length }}条证据；页面仅显示前300条，完整证据已保存到本地修订记录。</p>{% endif %}
+  <div class="stack">{% for item in candidate.evidence[:300] %}<div class="basis-note"><strong>{{ item.evidence_id }} · {{ item.locator }} · {{ item.entity_type }}</strong><br>{{ item.raw_text }}{% if item.layer %}<br>图层：{{ item.layer }}{% endif %}{% if item.handle %} · 句柄：{{ item.handle }}{% endif %}</div>{% endfor %}</div>
+</details>
+<script>(() => {
+  const regionFilter=document.getElementById('drawing-region-filter');
+  if(regionFilter){const sync=()=>document.querySelectorAll('.drawing-fact-card').forEach(card=>card.hidden=Boolean(regionFilter.value)&&card.dataset.region!==regionFilter.value);regionFilter.addEventListener('change',sync);}
+  const panelFilter=document.getElementById('drawing-panel-filter');
+  if(panelFilter){const sync=()=>document.querySelectorAll('.drawing-panel-card,.drawing-row-card').forEach(card=>card.hidden=Boolean(panelFilter.value)&&card.dataset.panel!==panelFilter.value);panelFilter.addEventListener('change',sync);}
+})();</script>
+{% endif %}
+{% endblock %}

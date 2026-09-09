@@ -64,6 +64,17 @@ from .drawing_audit import (
     audit_drawing_complete_circuit,
 )
 from .drawing_project_summary import summarize_drawing_circuits
+from .drawing_import import (
+    ConfirmedDrawingModel,
+    DrawingImportError,
+    DrawingSource,
+    FIELD_LABELS,
+    circuit_row_form_candidates,
+    confirmed_to_complete_circuit_form,
+    extract_drawing_bytes,
+    interpret_electrical,
+    parser_capabilities,
+)
 from .network_input import (
     CircuitNetworkInput,
     CircuitTaskMode,
@@ -750,6 +761,242 @@ def complete_circuit_page(request: Request):
     )
 
 
+@app.get("/drawing-import", response_class=HTMLResponse)
+def drawing_import_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="drawing_import.html",
+        context={
+            "capabilities": parser_capabilities(),
+            "candidate": None,
+            "error": "",
+            "projects": db.list_projects(),
+            "import_record_id": None,
+        },
+    )
+
+
+@app.get("/drawing-confirmations/{confirmation_id}", response_class=HTMLResponse)
+def drawing_confirmation_page(request: Request, confirmation_id: int):
+    confirmation = db.get_drawing_confirmation(confirmation_id)
+    if not confirmation:
+        raise HTTPException(404, "图纸确认修订不存在")
+    evidence_lookup = {
+        item["evidence_id"]: item
+        for item in confirmation["candidate_json"].get("evidence", [])
+    }
+    return templates.TemplateResponse(
+        request=request,
+        name="drawing_confirmation.html",
+        context={
+            "confirmation": confirmation,
+            "field_labels": FIELD_LABELS,
+            "evidence_lookup": evidence_lookup,
+        },
+    )
+
+
+@app.post("/drawing-import/extract", response_class=HTMLResponse)
+async def drawing_import_extract(
+    request: Request,
+    drawing: UploadFile = File(...),
+    project_id: str = Form(""),
+):
+    error = ""
+    candidate = None
+    import_record_id = None
+    content = await drawing.read(25 * 1024 * 1024 + 1)
+    if len(content) > 25 * 1024 * 1024:
+        error = "首版单个图纸限制为25MB；请拆分图纸或导出所需版面后再导入。"
+    else:
+        try:
+            bundle = extract_drawing_bytes(drawing.filename or "", content)
+            candidate = interpret_electrical(bundle)
+            selected_project_id = int(project_id) if project_id.strip() else None
+            import_record_id = db.create_drawing_import(
+                project_id=selected_project_id,
+                source=candidate.to_dict()["source"],
+                candidate=candidate.to_dict(),
+            )
+        except (DrawingImportError, ValueError) as exc:
+            error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="drawing_import.html",
+        context={
+            "capabilities": parser_capabilities(),
+            "candidate": candidate,
+            "error": error,
+            "projects": db.list_projects(),
+            "import_record_id": import_record_id,
+        },
+    )
+
+
+@app.post("/drawing-import/confirm", response_class=HTMLResponse)
+async def drawing_import_confirm(request: Request):
+    submitted = await request.form()
+    accepted: dict[str, str] = {}
+    evidence_by_field: dict[str, list[str]] = {}
+    rejected_fields: list[str] = []
+    errors: list[str] = []
+    correction_count = 0
+    all_indexes = {
+        key.removeprefix("field__")
+        for key in submitted
+        if key.startswith("field__")
+    }
+    accepted_indexes = {
+        key.removeprefix("accept__")
+        for key in submitted
+        if key.startswith("accept__")
+    }
+    for index in accepted_indexes:
+        field_name = str(submitted.get(f"field__{index}", "")).strip()
+        value = str(submitted.get(f"value__{index}", "")).strip()
+        original = str(submitted.get(f"original__{index}", "")).strip()
+        if not field_name or field_name not in _complete_circuit_form_defaults():
+            continue
+        if field_name in accepted and accepted[field_name] != value:
+            errors.append(f"{field_name}选择了多个冲突值，请只保留一个。")
+        else:
+            accepted[field_name] = value
+            evidence_by_field[field_name] = (
+                str(submitted.get(f"evidence__{index}", "")).split("|")
+                if value == original and submitted.get(f"evidence__{index}")
+                else []
+            )
+            if value != original:
+                correction_count += 1
+    for index in all_indexes - accepted_indexes:
+        field_name = str(submitted.get(f"field__{index}", "")).strip()
+        if field_name:
+            rejected_fields.append(field_name)
+    import_record_id = str(submitted.get("drawing_import_id", "")).strip()
+    source = DrawingSource(
+        filename=str(submitted.get("source_filename", "已导入图纸")),
+        format=str(submitted.get("source_format", "")),
+        sha256=str(submitted.get("source_sha256", "")),
+        size_bytes=0,
+        parser_name=str(submitted.get("source_parser", "")),
+        parser_version="1",
+    )
+    confirmed = ConfirmedDrawingModel(
+        source=source,
+        values=accepted,
+        evidence_by_field={key: tuple(value) for key, value in evidence_by_field.items()},
+        rejected_fields=tuple(dict.fromkeys(rejected_fields)),
+    )
+    form = confirmed_to_complete_circuit_form(
+        confirmed,
+        _drawing_import_form_defaults(),
+    )
+    confirmation_record = None
+    if import_record_id:
+        try:
+            confirmation_record = db.create_drawing_confirmation(
+                int(import_record_id),
+                confirmed_values=accepted,
+                evidence_by_field=evidence_by_field,
+                rejected_fields=rejected_fields,
+            )
+            form["drawing_import_confirmation_id"] = str(confirmation_record["id"])
+        except ValueError as exc:
+            errors.append(str(exc))
+    notices = [
+        f"已从{source.filename}带入{len(accepted)}个经确认字段；其余字段保持表单默认值或需用户核对。",
+        "图纸识别值只作为输入证据；点击计算前请复核完整回路与缺失条件。",
+    ]
+    if correction_count:
+        notices.append(f"其中{correction_count}项由用户修订，来源记为用户补充，不再标作原图提取值。")
+    if confirmation_record:
+        notices.append(
+            f"本次确认为不可覆盖修订V{confirmation_record['revision']}；后续重新确认将使本修订失效。"
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="circuit_audit.html",
+        context={
+            "form": form,
+            "segment_labels": _ENGINEERING_SEGMENT_LABELS,
+            "errors": errors,
+            "notices": notices,
+            "derived": None,
+            "audit_result": None,
+            "alternative_result": None,
+            "transformer_capacities": _engineering_transformer_capacities(),
+            "projects": db.list_projects(),
+            "drawing_import_source": source,
+        },
+    )
+
+
+@app.post("/drawing-import/select-row", response_class=HTMLResponse)
+async def drawing_import_select_row(
+    request: Request,
+    drawing_import_id: int = Form(...),
+    row_id: str = Form(...),
+):
+    imported = db.get_drawing_import(drawing_import_id)
+    if not imported:
+        raise HTTPException(404, "图纸提取记录不存在")
+    candidate = imported["candidate_json"]
+    row = next(
+        (item for item in candidate.get("circuit_rows", []) if item.get("row_id") == row_id),
+        None,
+    )
+    if row is None:
+        raise HTTPException(404, "所选分支回路不存在")
+    feeder_matches = [
+        item
+        for item in candidate.get("feeders", [])
+        if str(item.get("destination_panel_code", "")).upper()
+        == str(row.get("panel_code", "")).upper()
+    ]
+    usable_feeders = [item for item in feeder_matches if item.get("state") != "conflict"]
+    selected_feeder = usable_feeders[0] if len(usable_feeders) == 1 else None
+    selected_panel = next(
+        (item for item in candidate.get("panels", []) if item.get("panel_id") == row.get("panel_id")),
+        None,
+    )
+    transformer_matches = [
+        item
+        for item in candidate.get("transformers", [])
+        if selected_feeder
+        and item.get("drawing_region_id") == selected_feeder.get("drawing_region_id")
+    ]
+    usable_transformers = [item for item in transformer_matches if item.get("state") != "conflict"]
+    selected_transformer = usable_transformers[0] if len(usable_transformers) == 1 else None
+    panel_flow_matches = bool(
+        selected_panel
+        and selected_feeder
+        and selected_panel.get("design_current_a")
+        and selected_feeder.get("design_current_a")
+        and abs(float(selected_panel["design_current_a"]) - float(selected_feeder["design_current_a"])) < 0.01
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="drawing_row_confirmation.html",
+        context={
+            "import_record_id": drawing_import_id,
+            "source": candidate.get("source", {}),
+            "row": row,
+            "selected_panel": selected_panel,
+            "panel_flow_matches": panel_flow_matches,
+            "feeder_matches": feeder_matches,
+            "selected_feeder": selected_feeder,
+            "transformer_matches": transformer_matches,
+            "selected_transformer": selected_transformer,
+            "fields": circuit_row_form_candidates(
+                row,
+                selected_feeder,
+                selected_transformer,
+                selected_panel,
+            ),
+        },
+    )
+
+
 @app.post("/complete-circuit", response_class=HTMLResponse)
 async def complete_circuit_preview(request: Request):
     submitted = await request.form()
@@ -1022,6 +1269,7 @@ def _complete_circuit_form_defaults() -> dict[str, str]:
         "incoming_breaker_voltage_db": "",
         "incoming_breaker_icu_db": "",
         "incoming_breaker_reference_db": "",
+        "drawing_import_confirmation_id": "",
     }
     installed_sections = {"connection": "70", "feeder": "35", "final": "25"}
     breaker_defaults = {
@@ -1094,6 +1342,44 @@ def _drawing_circuit_form_defaults() -> dict[str, str]:
         "incoming_breaker_icu_db": "50",
         "incoming_breaker_reference_db": "图纸标注/产品样本",
     })
+    return form
+
+
+def _drawing_import_form_defaults() -> dict[str, str]:
+    """图纸导入后只保留明确的参考工况，不伪装未识别的图纸参数。"""
+
+    form = _drawing_circuit_form_defaults()
+    for field in (
+        "circuit_code",
+        "circuit_name",
+        "transformer_code",
+        "bus_section_code",
+        "feeder_cabinet_code",
+        "transformer_family",
+        "transformer_actual_model",
+        "transformer_capacity_kva",
+        "transformer_uk_percent",
+        "incoming_breaker_designation_db",
+        "incoming_breaker_in_db",
+        "incoming_breaker_frame_db",
+        "incoming_breaker_voltage_db",
+        "incoming_breaker_icu_db",
+        "incoming_breaker_reference_db",
+    ):
+        form[field] = ""
+    for segment_id in _ENGINEERING_SEGMENT_LABELS:
+        form[f"length_{segment_id}"] = ""
+        form[f"existing_section_{segment_id}"] = ""
+        form[f"existing_pe_section_{segment_id}"] = ""
+        form[f"breaker_designation_{segment_id}"] = ""
+        form[f"breaker_in_{segment_id}"] = ""
+        form[f"breaker_frame_{segment_id}"] = ""
+        form[f"breaker_voltage_{segment_id}"] = ""
+        form[f"breaker_icu_{segment_id}"] = ""
+        form[f"breaker_action_{segment_id}"] = ""
+    for node_id in ("main", "db"):
+        for suffix in ("designation", "current", "voltage", "icw", "reference"):
+            form[f"assembly_{suffix}_{node_id}"] = ""
     return form
 
 

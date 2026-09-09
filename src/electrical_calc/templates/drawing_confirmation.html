@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}图纸确认修订 · 电气计算台{% endblock %}
+{% block content %}
+<section class="hero circuit-head">
+  <div><p class="eyebrow">DRAWING CONFIRMATION</p><h1>图纸确认修订 V{{ confirmation.revision }}</h1><p>{{ confirmation.filename }} · {{ confirmation.source_format }}</p></div>
+  <aside class="quick-badge"><span>状态</span><strong>{{ '已失效' if confirmation.stale else '当前确认' }}</strong><small>记录不可覆盖；重新确认会生成下一修订</small></aside>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">SOURCE</p><h2>原图身份</h2></div></div>
+  <div class="summary-grid"><div><span>文件</span><strong>{{ confirmation.filename }}</strong></div><div><span>格式</span><strong>{{ confirmation.source_format }}</strong></div><div><span>提取记录</span><strong>#{{ confirmation.drawing_import_id }}</strong></div><div><span>确认记录</span><strong>#{{ confirmation.id }}</strong></div></div>
+  <p class="muted">SHA-256：{{ confirmation.source_sha256 }}</p>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><p class="eyebrow">CONFIRMED FACTS</p><h2>已确认字段与证据</h2></div></div>
+  {% if confirmation.confirmed_values_json %}
+  <div class="selection-grid">
+    {% for field, value in confirmation.confirmed_values_json.items() %}
+    <article class="selection-card">
+      <h3>{{ field_labels.get(field, field) }}</h3><p class="selection-value">{{ value }}</p>
+      {% set ids = confirmation.evidence_by_field_json.get(field, []) %}
+      {% if ids %}<p class="muted">原图证据：{{ ids|join('、') }}</p>{% for id in ids %}{% set item=evidence_lookup.get(id) %}{% if item %}<div class="basis-note"><strong>{{ id }} · {{ item.locator }}</strong><br>{{ item.raw_text }}{% if item.layer %}<br>图层：{{ item.layer }}{% endif %}{% if item.handle %} · 句柄：{{ item.handle }}{% endif %}</div>{% endif %}{% endfor %}{% else %}<p class="status-pill pending">用户修订/补充，不标作原图值</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<div class="alert warning">本修订没有确认任何字段。</div>{% endif %}
+  {% if confirmation.rejected_fields_json %}<div class="basis-note"><strong>未采用字段：</strong>{{ confirmation.rejected_fields_json|join('、') }}</div>{% endif %}
+</section>
+{% endblock %}

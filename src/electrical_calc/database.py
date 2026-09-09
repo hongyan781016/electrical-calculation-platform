@@ -115,6 +115,35 @@ class Database:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS drawing_import_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+                    filename TEXT NOT NULL,
+                    source_format TEXT NOT NULL,
+                    source_sha256 TEXT NOT NULL,
+                    source_size_bytes INTEGER NOT NULL,
+                    parser_name TEXT NOT NULL,
+                    parser_version TEXT NOT NULL,
+                    candidate_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_drawing_import_project
+                    ON drawing_import_revisions(project_id,id DESC);
+                CREATE INDEX IF NOT EXISTS idx_drawing_import_hash
+                    ON drawing_import_revisions(source_sha256,id DESC);
+                CREATE TABLE IF NOT EXISTS drawing_confirmation_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    drawing_import_id INTEGER NOT NULL REFERENCES drawing_import_revisions(id) ON DELETE CASCADE,
+                    revision INTEGER NOT NULL,
+                    confirmed_values_json TEXT NOT NULL,
+                    evidence_by_field_json TEXT NOT NULL,
+                    rejected_fields_json TEXT NOT NULL,
+                    stale INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(drawing_import_id,revision)
+                );
+                CREATE INDEX IF NOT EXISTS idx_drawing_confirmation_import
+                    ON drawing_confirmation_revisions(drawing_import_id,id DESC);
                 CREATE TABLE IF NOT EXISTS network_calculation_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -693,6 +722,141 @@ class Database:
                 "changed": True,
                 "changed_fields": changed_fields,
             }
+
+    def create_drawing_import(
+        self,
+        *,
+        project_id: int | None,
+        source: dict[str, Any],
+        candidate: dict[str, Any],
+    ) -> int:
+        """保存不可覆盖的图纸提取证据包。"""
+
+        now = utc_now()
+        with self.connect() as conn:
+            if project_id is not None and not conn.execute(
+                "SELECT id FROM projects WHERE id=?", (project_id,)
+            ).fetchone():
+                raise ValueError("项目不存在")
+            cursor = conn.execute(
+                """
+                INSERT INTO drawing_import_revisions
+                (project_id,filename,source_format,source_sha256,source_size_bytes,
+                 parser_name,parser_version,candidate_json,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    project_id,
+                    str(source.get("filename", "")),
+                    str(source.get("format", "")),
+                    str(source.get("sha256", "")),
+                    int(source.get("size_bytes", 0)),
+                    str(source.get("parser_name", "")),
+                    str(source.get("parser_version", "")),
+                    self._canonical_json(candidate),
+                    now,
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def get_drawing_import(self, import_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM drawing_import_revisions WHERE id=?", (import_id,)
+            ).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            item["candidate_json"] = json.loads(item["candidate_json"])
+            return item
+
+    def create_drawing_confirmation(
+        self,
+        drawing_import_id: int,
+        *,
+        confirmed_values: dict[str, str],
+        evidence_by_field: dict[str, list[str]],
+        rejected_fields: list[str],
+    ) -> dict[str, int]:
+        """保存确认修订，并使同一提取记录的旧确认失效。"""
+
+        now = utc_now()
+        with self.connect() as conn:
+            imported = conn.execute(
+                "SELECT id,project_id FROM drawing_import_revisions WHERE id=?",
+                (drawing_import_id,),
+            ).fetchone()
+            if not imported:
+                raise ValueError("图纸提取记录不存在")
+            previous_ids = [
+                int(row["id"])
+                for row in conn.execute(
+                    "SELECT id FROM drawing_confirmation_revisions WHERE drawing_import_id=? AND stale=0",
+                    (drawing_import_id,),
+                ).fetchall()
+            ]
+            previous = conn.execute(
+                "SELECT COALESCE(MAX(revision),0) FROM drawing_confirmation_revisions WHERE drawing_import_id=?",
+                (drawing_import_id,),
+            ).fetchone()[0]
+            revision = int(previous) + 1
+            conn.execute(
+                "UPDATE drawing_confirmation_revisions SET stale=1 WHERE drawing_import_id=?",
+                (drawing_import_id,),
+            )
+            # 已保存的回路输入包含确认修订ID。重新确认后，引用旧确认的计算
+            # 记录必须失效，不能继续作为当前图纸的有效成果。
+            if imported["project_id"] is not None:
+                for old_id in previous_ids:
+                    pattern = f'%"drawing_import_confirmation_id":"{old_id}"%'
+                    conn.execute(
+                        "UPDATE network_calculation_runs SET stale=1 WHERE project_id=? AND input_snapshot LIKE ?",
+                        (imported["project_id"], pattern),
+                    )
+                    conn.execute(
+                        "UPDATE drawing_circuit_runs SET stale=1 WHERE project_id=? AND input_snapshot LIKE ?",
+                        (imported["project_id"], pattern),
+                    )
+            cursor = conn.execute(
+                """
+                INSERT INTO drawing_confirmation_revisions
+                (drawing_import_id,revision,confirmed_values_json,evidence_by_field_json,
+                 rejected_fields_json,stale,created_at)
+                VALUES (?,?,?,?,?,0,?)
+                """,
+                (
+                    drawing_import_id,
+                    revision,
+                    self._canonical_json(confirmed_values),
+                    self._canonical_json(evidence_by_field),
+                    json.dumps(rejected_fields, ensure_ascii=False),
+                    now,
+                ),
+            )
+            return {"id": int(cursor.lastrowid), "revision": revision}
+
+    def get_drawing_confirmation(self, confirmation_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT c.*,i.filename,i.source_format,i.source_sha256,i.project_id,i.candidate_json
+                FROM drawing_confirmation_revisions c
+                JOIN drawing_import_revisions i ON i.id=c.drawing_import_id
+                WHERE c.id=?
+                """,
+                (confirmation_id,),
+            ).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            for key in (
+                "confirmed_values_json",
+                "evidence_by_field_json",
+                "rejected_fields_json",
+            ):
+                item[key] = json.loads(item[key])
+            item["candidate_json"] = json.loads(item["candidate_json"])
+            return item
 
     def get_project_network(self, project_id: int) -> dict[str, Any] | None:
         with self.connect() as conn:

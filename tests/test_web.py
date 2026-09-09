@@ -26,7 +26,7 @@ def capture_template_context(monkeypatch):
 def test_health_and_project_flow(tmp_path, monkeypatch):
     monkeypatch.setattr(web, "db", Database(tmp_path / "web.db"))
     client = TestClient(web.app)
-    assert client.get("/health").json() == {"status": "ok", "version": "0.7.0"}
+    assert client.get("/health").json() == {"status": "ok", "version": "0.8.0"}
 
     response = client.post(
         "/projects",
@@ -60,6 +60,245 @@ def test_health_and_project_flow(tmp_path, monkeypatch):
     run_page = client.get(response.headers["location"])
     assert run_page.status_code == 200
     assert "负荷与选型" in run_page.text
+
+
+def test_drawing_import_extract_and_confirm_enters_existing_audit_form(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "drawing-import.db"))
+    client = TestClient(web.app)
+    dxf = "\n".join(
+        [
+            "0", "SECTION", "2", "ENTITIES",
+            "0", "TEXT", "5", "1", "8", "E-TEXT", "10", "10", "20", "20", "1", "回路 C-DWG-01",
+            "0", "TEXT", "5", "2", "8", "E-TEXT", "10", "20", "20", "30", "1", "末端负荷 30kW cosφ=0.9",
+            "0", "ENDSEC", "0", "EOF", "",
+        ]
+    ).encode("utf-8")
+
+    page = client.get("/drawing-import")
+    assert page.status_code == 200
+    assert "图纸辅助识别" in page.text
+
+    extracted = client.post(
+        "/drawing-import/extract",
+        data={"project_id": ""},
+        files={"drawing": ("sample.dxf", dxf, "application/dxf")},
+    )
+    assert extracted.status_code == 200
+    assert "C-DWG-01" in extracted.text
+    assert "SHA-256" in extracted.text
+    assert "待人工确认" in extracted.text
+    with web.db.connect() as conn:
+        import_id = conn.execute("SELECT id FROM drawing_import_revisions").fetchone()[0]
+
+    confirmed = client.post(
+        "/drawing-import/confirm",
+        data={
+            "source_filename": "sample.dxf",
+            "source_format": "DXF",
+            "source_sha256": "abc",
+            "source_parser": "builtin-ascii-dxf",
+            "drawing_import_id": str(import_id),
+            "accept__0": "on",
+            "field__0": "circuit_code",
+            "value__0": "C-DWG-01",
+            "original__0": "C-DWG-01",
+            "evidence__0": "E00001",
+        },
+    )
+    assert confirmed.status_code == 200
+    assert "图纸辅助导入" in confirmed.text
+    assert 'value="C-DWG-01"' in confirmed.text
+    assert 'value="audit" selected' in confirmed.text
+    with web.db.connect() as conn:
+        confirmation = conn.execute(
+            "SELECT revision,stale FROM drawing_confirmation_revisions"
+        ).fetchone()
+    assert confirmation["revision"] == 1
+    assert confirmation["stale"] == 0
+    confirmation_page = client.get("/drawing-confirmations/1")
+    assert confirmation_page.status_code == 200
+    assert "图纸确认修订 V1" in confirmation_page.text
+    assert "C-DWG-01" in confirmation_page.text
+    assert "E00001" in confirmation_page.text
+
+
+def test_drawing_import_selected_row_is_reviewed_without_other_circuits(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "drawing-row.db"))
+    client = TestClient(web.app)
+    project_id = web.db.create_project("P-DWG-V08", "图纸导入端到端")
+    dxf = ("\n".join([
+        "0", "SECTION", "2", "ENTITIES",
+        "0", "ATTRIB", "5", "1", "8", "LABEL", "2", "图号", "10", "100", "20", "0", "1", "E-23",
+        "0", "ATTRIB", "5", "2", "8", "LABEL", "2", "图名", "10", "100", "20", "10", "1", "配电箱系统图一",
+        "0", "TEXT", "5", "3", "8", "E", "10", "1000", "20", "5000", "1", "5AL1-1",
+        "0", "TEXT", "5", "4", "8", "E", "10", "800", "20", "4500", "1", "Pe=",
+        "0", "TEXT", "5", "5", "8", "E", "10", "1200", "20", "4300", "1", "Ijs=",
+        "0", "TEXT", "5", "51", "8", "E", "10", "1400", "20", "4500", "1", "15.0kW",
+        "0", "TEXT", "5", "52", "8", "E", "10", "1600", "20", "4300", "1", "22.8A",
+        "0", "TEXT", "5", "53", "8", "E", "10", "900", "20", "2500", "1", "CM3-125L/3P/63A",
+        "0", "TEXT", "5", "6", "8", "E", "10", "3000", "20", "3500", "1", "CH2-63C/10/1",
+        "0", "TEXT", "5", "7", "8", "E", "10", "5000", "20", "3500", "1", "WL1",
+        "0", "TEXT", "5", "8", "8", "E", "10", "6000", "20", "3500", "1", "0.48kW",
+        "0", "TEXT", "5", "9", "8", "E", "10", "6500", "20", "3500", "1", "车间照明",
+        "0", "TEXT", "5", "A", "8", "E", "10", "7500", "20", "3500", "1", "ZC-BVV-2*2.5+PE-2.5",
+        "0", "TEXT", "5", "B", "8", "E", "10", "10000", "20", "10000", "1", "D7-1:监管仓库",
+        "0", "TEXT", "5", "C", "8", "E", "10", "9500", "20", "9600", "1", "CM3-100H/3P",
+        "0", "TEXT", "5", "D", "8", "E", "10", "9500", "20", "9400", "1", "63A",
+        "0", "TEXT", "5", "E", "8", "E", "10", "10500", "20", "9500", "1", "P=15.0kW Ijs=22.8A",
+        "0", "TEXT", "5", "F", "8", "E", "10", "10800", "20", "9000", "1", "YJV-1-4*25+1*16",
+        "0", "TEXT", "5", "10", "8", "E", "10", "11200", "20", "9600", "1", "5AL1-1",
+        "0", "TEXT", "5", "11", "8", "E", "10", "15000", "20", "11000", "1", "B1",
+        "0", "TEXT", "5", "12", "8", "E", "10", "15000", "20", "5000", "1", "SCB14-1000kVA",
+        "0", "TEXT", "5", "13", "8", "E", "10", "15000", "20", "4500", "1", "Uk%=6%",
+        "0", "TEXT", "5", "14", "8", "E", "10", "15000", "20", "4700", "1", "10/0.4/0.23kV Dyn11",
+        "0", "TEXT", "5", "15", "8", "E", "10", "14500", "20", "10500", "1", "D1",
+        "0", "TEXT", "5", "16", "8", "E", "10", "14500", "20", "10000", "1", "TMY－4(100x10)",
+        "0", "TEXT", "5", "17", "8", "E", "10", "14500", "20", "5500", "1", "CW2-2500/4P",
+        "0", "TEXT", "5", "18", "8", "E", "10", "14500", "20", "5200", "1", "In=2000A",
+        "0", "ENDSEC", "0", "EOF", "",
+    ])).encode("utf-8")
+    extracted = client.post(
+        "/drawing-import/extract",
+        data={"project_id": str(project_id)},
+        files={"drawing": ("panel.dxf", dxf, "application/dxf")},
+    )
+    assert extracted.status_code == 200
+    assert "选择此回路并核对" in extracted.text
+    assert "确认并带入完整回路核验" not in extracted.text
+    imported = web.db.get_drawing_import(1)
+    row_id = imported["candidate_json"]["circuit_rows"][0]["row_id"]
+    selected = client.post(
+        "/drawing-import/select-row",
+        data={"drawing_import_id": "1", "row_id": row_id},
+    )
+    assert selected.status_code == 200
+    assert "5AL1-1 · WL1" in selected.text
+    assert "这里只确认所选配电箱的一条分支" in selected.text
+    assert 'name="value__0" value="WL1"' in selected.text
+    assert "D7 / D7-1" in selected.text
+    assert "YJV-1-4*25+1*16" in selected.text
+    assert "SCB14" in selected.text
+    assert "CW2-2500/4P" in selected.text
+    assert "CM3-125L/3P/63A" in selected.text
+    assert "与上游馈线Ijs" in selected.text
+    assert "一致" in selected.text
+    assert "仍需核对完整链路" in selected.text
+
+    candidate = imported["candidate_json"]
+    row = candidate["circuit_rows"][0]
+    panel = next(item for item in candidate["panels"] if item["panel_id"] == row["panel_id"])
+    feeder = next(item for item in candidate["feeders"] if item["destination_panel_code"] == "5AL1-1")
+    transformer = candidate["transformers"][0]
+    fields = web.circuit_row_form_candidates(row, feeder, transformer, panel)
+    confirmation_data = {
+        "drawing_import_id": "1",
+        "source_filename": "panel.dxf",
+        "source_format": "DXF",
+        "source_sha256": candidate["source"]["sha256"],
+        "source_parser": candidate["source"]["parser_name"],
+    }
+    for index, field in enumerate(fields):
+        confirmation_data[f"accept__{index}"] = "on"
+        confirmation_data[f"field__{index}"] = field["field_name"]
+        confirmation_data[f"value__{index}"] = field["value"]
+        confirmation_data[f"original__{index}"] = field["value"]
+        confirmation_data[f"evidence__{index}"] = "|".join(field["evidence_ids"])
+    confirmed = client.post("/drawing-import/confirm", data=confirmation_data)
+    assert confirmed.status_code == 200
+    assert 'value="WL1"' in confirmed.text
+    assert 'value="SCB14"' in confirmed.text
+    assert 'value="D7"' in confirmed.text
+    assert "QF0 250A" not in confirmed.text
+
+    form = web._drawing_import_form_defaults()
+    form.update({field["field_name"]: field["value"] for field in fields})
+    form.update({
+        "drawing_import_confirmation_id": "1",
+        "bus_section_code": "B1-0.4kV母线",
+        "transformer_family": "scb11",
+        "connection_line_type": "internal_connection",
+        "length_connection": "0",
+        "length_feeder": "100",
+        "length_final": "100",
+    })
+    preview = client.post("/complete-circuit", data=form)
+    assert preview.status_code == 200
+    assert "系统推导的入口参数" in preview.text
+    saved = client.post(
+        f"/projects/{project_id}/complete-circuit",
+        data=form,
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303, saved.text
+    run_id = int(saved.headers["location"].rsplit("/", 1)[1])
+    run = web.db.get_network_run(run_id)
+    assert run["input_snapshot"]["drawing_import_confirmation_id"] == "1"
+    assert client.get(f"/network-runs/{run_id}/report.pdf").content.startswith(b"%PDF")
+    assert client.get(f"/network-runs/{run_id}/export.xlsx").content.startswith(b"PK")
+
+
+def test_explicit_direct_start_motor_drawing_candidate_runs_complete_circuit(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(web, "db", Database(tmp_path / "drawing-motor.db"))
+    client = TestClient(web.app)
+    project_id = web.db.create_project("P-DWG-MOTOR", "图纸电动机端到端")
+    fields = web.circuit_row_form_candidates(
+        {
+            "circuit_code": "M1",
+            "destination": "4极直接启动电动机",
+            "load_kw": "30",
+            "breaker_spec": "CM3-100H/3P/63A",
+            "cable_spec": "YJV-3*25+PE-16",
+            "circuit_evidence_ids": ("E00001",),
+            "destination_evidence_ids": ("E00002",),
+            "load_evidence_ids": ("E00003",),
+            "breaker_evidence_ids": ("E00004",),
+            "cable_evidence_ids": ("E00005",),
+        }
+    )
+    candidate_values = {field["field_name"]: field["value"] for field in fields}
+    assert candidate_values["load_kind"] == "motor"
+    assert candidate_values["terminal_phase"] == "3"
+    assert candidate_values["breaker_in_final"] == "63"
+    assert candidate_values["configuration_final"] == "yjv_3c_3ph_pe"
+
+    form = web._drawing_import_form_defaults()
+    form.update(candidate_values)
+    form.update(
+        {
+            "bus_section_code": "T1-0.4kV母线",
+            "transformer_code": "T1",
+            "transformer_actual_model": "SCB11",
+            "transformer_family": "scb11",
+            "transformer_capacity_kva": "1000",
+            "transformer_uk_percent": "6",
+            "feeder_cabinet_code": "AA1",
+            "connection_line_type": "internal_connection",
+            "length_connection": "0",
+            "length_feeder": "100",
+            "length_final": "100",
+            "existing_section_feeder": "25",
+            "existing_pe_section_feeder": "16",
+            "breaker_designation_feeder": "CM3-100H/3P/63A",
+            "breaker_in_feeder": "63",
+            "breaker_frame_feeder": "100",
+        }
+    )
+    preview = client.post("/complete-circuit", data=form)
+    assert preview.status_code == 200
+    assert "4极直接启动电动机" in preview.text
+    saved = client.post(
+        f"/projects/{project_id}/complete-circuit",
+        data=form,
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303, saved.text
+    run_id = int(saved.headers["location"].rsplit("/", 1)[1])
+    run = web.db.get_network_run(run_id)
+    assert run["input_snapshot"]["load_kind"] == "motor"
+    assert client.get(f"/network-runs/{run_id}/report.pdf").content.startswith(b"%PDF")
+    assert client.get(f"/network-runs/{run_id}/export.xlsx").content.startswith(b"PK")
 
 
 def test_rule_cannot_be_approved_without_source(tmp_path, monkeypatch):

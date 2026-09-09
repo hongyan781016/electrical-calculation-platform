@@ -51,6 +51,7 @@ NETWORK_INPUT_LABELS = {
     "temperature_feeder": "馈线段环境温度(℃)", "temperature_final": "末端段环境温度(℃)",
     "connection_line_type": "变压器出口连接部件", "busway_series_code": "母线槽系列",
     "busway_rating_a": "母线槽额定电流(A)",
+    "drawing_import_confirmation_id": "图纸确认修订ID",
 }
 NETWORK_VALUE_LABELS = {
     "design": "快速设计", "audit": "既有设计核验", "kw": "有功功率(kW)",

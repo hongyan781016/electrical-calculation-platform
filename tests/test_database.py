@@ -1,6 +1,50 @@
+import pytest
+
 from src.electrical_calc.database import Database
 from src.electrical_calc.engine import calculate_all
-import pytest
+
+
+def test_drawing_import_and_confirmation_revisions_are_immutable_and_stale(tmp_path):
+    database = Database(tmp_path / "drawing-revisions.db")
+    project_id = database.create_project("DWG-01", "图纸导入测试")
+    import_id = database.create_drawing_import(
+        project_id=project_id,
+        source={
+            "filename": "sample.dxf",
+            "format": "DXF",
+            "sha256": "abc123",
+            "size_bytes": 123,
+            "parser_name": "builtin-ascii-dxf",
+            "parser_version": "1",
+        },
+        candidate={"facts": [{"field_name": "circuit_code", "value": "C-1"}]},
+    )
+    stored = database.get_drawing_import(import_id)
+    assert stored["project_id"] == project_id
+    assert stored["candidate_json"]["facts"][0]["value"] == "C-1"
+
+    first = database.create_drawing_confirmation(
+        import_id,
+        confirmed_values={"circuit_code": "C-1"},
+        evidence_by_field={"circuit_code": ["E00001"]},
+        rejected_fields=[],
+    )
+    second = database.create_drawing_confirmation(
+        import_id,
+        confirmed_values={"circuit_code": "C-1A"},
+        evidence_by_field={"circuit_code": []},
+        rejected_fields=["load_value"],
+    )
+    assert first["revision"] == 1
+    assert second["revision"] == 2
+    with database.connect() as conn:
+        rows = conn.execute(
+            "SELECT revision,stale FROM drawing_confirmation_revisions ORDER BY revision"
+        ).fetchall()
+    assert [(row["revision"], row["stale"]) for row in rows] == [(1, 1), (2, 0)]
+    latest = database.get_drawing_confirmation(second["id"])
+    assert latest["confirmed_values_json"] == {"circuit_code": "C-1A"}
+    assert latest["evidence_by_field_json"] == {"circuit_code": []}
 
 
 def sample_circuit(code="AL-01"):
